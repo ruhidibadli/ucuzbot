@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 export const metadata: Metadata = {
-  title: "UcuzBot - Azərbaycanda Qiymət İzləyici",
+  title: "UcuzBot - Az\u0259rbaycanda Qiym\u0259t \u0130zl\u0259yici",
   description:
-    "Azərbaycan mağazalarında qiymətləri izləyin və ən ucuz qiyməti tapın. Track prices across Azerbaijan stores.",
+    "Az\u0259rbaycan ma\u011Fazalar\u0131nda qiym\u0259tl\u0259ri izl\u0259yin v\u0259 \u0259n ucuz qiym\u0259ti tap\u0131n. Track prices across Azerbaijan stores.",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -39,7 +40,7 @@ export default function RootLayout({
         />
       </head>
       <body style={{ margin: 0, padding: 0, background: "#0b0f1a" }}>
-        {children}
+        <AuthProvider>{children}</AuthProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `

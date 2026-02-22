@@ -1,98 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-
-const API_BASE = "/api/v1";
-
-const stores = [
-  { slug: "kontakt", name: "Kontakt Home", type: "Elektronika", icon: "\u{1F3EA}" },
-  { slug: "baku_electronics", name: "Baku Electronics", type: "Elektronika", icon: "\u{1F4BB}" },
-  { slug: "irshad", name: "Irshad", type: "Elektronika", icon: "\u{1F4F1}" },
-  { slug: "maxi", name: "Maxi.az", type: "Marketplace", icon: "\u{1F6D2}" },
-  { slug: "tap_az", name: "Tap.az", type: "Elanlar", icon: "\u{1F4CB}" },
-  { slug: "umico", name: "Umico", type: "Marketplace", icon: "\u{1F381}" },
-];
-
-function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray.buffer as ArrayBuffer;
-}
-
-interface AlertData {
-  id: number;
-  search_query: string;
-  target_price: number;
-  store_slugs: string[];
-  is_active: boolean;
-  is_triggered: boolean;
-  triggered_at: string | null;
-  last_checked_at: string | null;
-  lowest_price_found: number | null;
-  lowest_price_store: string | null;
-  lowest_price_url: string | null;
-  created_at: string;
-}
-
-interface SearchResult {
-  product_name: string;
-  price: number;
-  product_url: string;
-  store_slug: string;
-  store_name: string;
-  image_url: string | null;
-  in_stock: boolean;
-}
-
-interface AuthUser {
-  id: number;
-  email: string | null;
-  first_name: string | null;
-  language_code: string;
-  subscription_tier: string;
-  max_alerts: number;
-  created_at: string;
-}
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/contexts/AuthContext";
+import { stores } from "@/lib/constants";
+import { searchProducts } from "@/lib/api";
+import type { SearchResult } from "@/lib/types";
+import AuthModal from "@/components/AuthModal";
 
 export default function Home() {
-  // Auth state
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const { user, token, isLoading } = useAuth();
+  const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authFirstName, setAuthFirstName] = useState("");
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(false);
-
-  // Push state
-  const [pushSupported, setPushSupported] = useState(false);
-  const [pushSubscribed, setPushSubscribed] = useState(false);
-  const [pushEndpoint, setPushEndpoint] = useState<string | null>(null);
-  const [pushLoading, setPushLoading] = useState(false);
-  const [pushError, setPushError] = useState<string | null>(null);
-
-  // Alert form state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [targetPrice, setTargetPrice] = useState("");
-  const [selectedStores, setSelectedStores] = useState<string[]>(
-    stores.map((s) => s.slug)
-  );
-  const [alertStatus, setAlertStatus] = useState<{
-    type: "success" | "error" | "info";
-    message: string;
-  } | null>(null);
-  const [alertLoading, setAlertLoading] = useState(false);
-
-  // My alerts state
-  const [myAlerts, setMyAlerts] = useState<AlertData[]>([]);
-  const [alertsLoading, setAlertsLoading] = useState(false);
 
   // Search state
   const [productSearch, setProductSearch] = useState("");
@@ -101,324 +21,6 @@ export default function Home() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Check now loading state
-  const [checkingAlertId, setCheckingAlertId] = useState<number | null>(null);
-
-  // Auth helpers
-  function getAuthHeaders(): Record<string, string> {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (authToken) {
-      headers["Authorization"] = `Bearer ${authToken}`;
-    }
-    return headers;
-  }
-
-  const validateToken = useCallback(async (token: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const user = await res.json();
-        setAuthUser(user);
-        setAuthToken(token);
-        return true;
-      }
-      localStorage.removeItem("ucuzbot_token");
-      return false;
-    } catch {
-      return false;
-    }
-  }, []);
-
-  // Load token on mount
-  useEffect(() => {
-    const token = localStorage.getItem("ucuzbot_token");
-    if (token) {
-      validateToken(token);
-    }
-  }, [validateToken]);
-
-  async function handleAuth(e: React.FormEvent) {
-    e.preventDefault();
-    setAuthError(null);
-    setAuthLoading(true);
-    try {
-      const endpoint = authMode === "register" ? "/auth/register" : "/auth/login";
-      const body: Record<string, string> = { email: authEmail, password: authPassword };
-      if (authMode === "register" && authFirstName.trim()) {
-        body.first_name = authFirstName.trim();
-      }
-      const res = await fetch(`${API_BASE}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "Authentication failed");
-      }
-      localStorage.setItem("ucuzbot_token", data.access_token);
-      setAuthToken(data.access_token);
-      setAuthUser(data.user);
-      setShowAuthModal(false);
-      setAuthEmail("");
-      setAuthPassword("");
-      setAuthFirstName("");
-    } catch (err: unknown) {
-      setAuthError(err instanceof Error ? err.message : "Authentication failed");
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
-  function handleLogout() {
-    localStorage.removeItem("ucuzbot_token");
-    setAuthToken(null);
-    setAuthUser(null);
-    setMyAlerts([]);
-  }
-
-  // Fetch alerts for authenticated user
-  const fetchMyAlertsAuth = useCallback(async (token: string) => {
-    setAlertsLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/alerts/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setMyAlerts(await res.json());
-      }
-    } catch {
-      // ignore
-    } finally {
-      setAlertsLoading(false);
-    }
-  }, []);
-
-  // Fetch alerts for push-subscribed user
-  const fetchMyAlertsPush = useCallback(async (endpoint: string) => {
-    setAlertsLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/alerts/by-push`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint }),
-      });
-      if (res.ok) {
-        setMyAlerts(await res.json());
-      }
-    } catch {
-      // ignore
-    } finally {
-      setAlertsLoading(false);
-    }
-  }, []);
-
-  // Combined fetch alerts
-  const fetchMyAlerts = useCallback(() => {
-    if (authToken) {
-      fetchMyAlertsAuth(authToken);
-    } else if (pushEndpoint) {
-      fetchMyAlertsPush(pushEndpoint);
-    }
-  }, [authToken, pushEndpoint, fetchMyAlertsAuth, fetchMyAlertsPush]);
-
-  // Load alerts when auth or push changes
-  useEffect(() => {
-    fetchMyAlerts();
-  }, [fetchMyAlerts]);
-
-  // Push notification handlers
-  const checkExistingSubscription = useCallback(async () => {
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        setPushSubscribed(true);
-        setPushEndpoint(sub.endpoint);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  useEffect(() => {
-    if ("serviceWorker" in navigator && "PushManager" in window) {
-      setPushSupported(true);
-      checkExistingSubscription();
-    }
-  }, [checkExistingSubscription]);
-
-  async function handleSubscribe() {
-    setPushLoading(true);
-    setPushError(null);
-    try {
-      const res = await fetch(`${API_BASE}/push/vapid-key`);
-      if (!res.ok) throw new Error("Could not get VAPID key");
-      const { public_key } = await res.json();
-
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(public_key),
-      });
-
-      const subJSON = sub.toJSON();
-      const saveRes = await fetch(`${API_BASE}/push/subscribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: subJSON.endpoint,
-          keys: {
-            p256dh: subJSON.keys?.p256dh,
-            auth: subJSON.keys?.auth,
-          },
-        }),
-      });
-      if (!saveRes.ok) throw new Error("Failed to save subscription");
-
-      setPushSubscribed(true);
-      setPushEndpoint(subJSON.endpoint || null);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Subscription failed";
-      setPushError(message);
-    } finally {
-      setPushLoading(false);
-    }
-  }
-
-  async function handleUnsubscribe() {
-    setPushLoading(true);
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        await fetch(`${API_BASE}/push/unsubscribe`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
-        });
-        await sub.unsubscribe();
-      }
-      setPushSubscribed(false);
-      setPushEndpoint(null);
-    } catch {
-      setPushError("Could not unsubscribe");
-    } finally {
-      setPushLoading(false);
-    }
-  }
-
-  // Store selection
-  function toggleStore(slug: string) {
-    setSelectedStores((prev) =>
-      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
-    );
-  }
-
-  function toggleAllStores() {
-    if (selectedStores.length === stores.length) {
-      setSelectedStores([]);
-    } else {
-      setSelectedStores(stores.map((s) => s.slug));
-    }
-  }
-
-  // Create alert
-  async function handleCreateAlert(e: React.FormEvent) {
-    e.preventDefault();
-    if (!searchQuery.trim() || !targetPrice || selectedStores.length === 0) {
-      setAlertStatus({
-        type: "error",
-        message: "Bütün sahələri doldurun və ən azı bir mağaza seçin. / Please fill all fields and select at least one store.",
-      });
-      return;
-    }
-
-    const isAuthenticated = !!authToken;
-    const hasPush = pushSubscribed && pushEndpoint;
-
-    if (!isAuthenticated && !hasPush) {
-      setAlertStatus({
-        type: "info",
-        message: "Daxil olun və ya bildirişləri aktivləşdirin. / Please login or enable notifications first.",
-      });
-      return;
-    }
-
-    setAlertLoading(true);
-    setAlertStatus(null);
-    try {
-      const body: Record<string, unknown> = {
-        search_query: searchQuery.trim(),
-        target_price: parseFloat(targetPrice),
-        store_slugs: selectedStores,
-      };
-      if (!isAuthenticated && hasPush) {
-        body.push_endpoint = pushEndpoint;
-      }
-
-      const res = await fetch(`${API_BASE}/alerts`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || "Failed to create alert");
-      }
-      setAlertStatus({
-        type: "success",
-        message: "Alert yaradıldı! Qiymətlər yoxlanılır... / Alert created! Checking prices now...",
-      });
-      setSearchQuery("");
-      setTargetPrice("");
-      // Refresh alerts immediately and again after price check completes
-      fetchMyAlerts();
-      setTimeout(fetchMyAlerts, 15000);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to create alert";
-      setAlertStatus({ type: "error", message });
-    } finally {
-      setAlertLoading(false);
-    }
-  }
-
-  // Delete alert
-  async function handleDeleteAlert(alertId: number) {
-    try {
-      const res = await fetch(`${API_BASE}/alerts/${alertId}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
-      if (res.ok) {
-        setMyAlerts((prev) => prev.filter((a) => a.id !== alertId));
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  // Check now
-  async function handleCheckNow(alertId: number) {
-    setCheckingAlertId(alertId);
-    try {
-      await fetch(`${API_BASE}/alerts/${alertId}/check`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
-      setTimeout(fetchMyAlerts, 10000);
-    } catch {
-      // ignore
-    } finally {
-      setTimeout(() => setCheckingAlertId(null), 2000);
-    }
-  }
-
-  // Product search
   async function handleProductSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!productSearch.trim()) return;
@@ -426,15 +28,8 @@ export default function Home() {
     setSearchError(null);
     setHasSearched(true);
     try {
-      const res = await fetch(
-        `${API_BASE}/search?q=${encodeURIComponent(productSearch.trim())}`
-      );
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || "Search failed");
-      }
-      const data = await res.json();
-      setSearchResults(data.results || []);
+      const data = await searchProducts(productSearch.trim());
+      setSearchResults(data);
     } catch (err: unknown) {
       setSearchError(err instanceof Error ? err.message : "Search failed");
       setSearchResults([]);
@@ -443,8 +38,10 @@ export default function Home() {
     }
   }
 
-  const canCreateAlert = !!authToken || (pushSubscribed && !!pushEndpoint);
-  const showAlerts = myAlerts.length > 0 || (canCreateAlert && alertsLoading);
+  function handleAuthSuccess() {
+    setShowAuthModal(false);
+    router.push("/dashboard");
+  }
 
   return (
     <div>
@@ -470,18 +67,13 @@ export default function Home() {
             </svg>
             Telegram Bot
           </a>
-          {authUser ? (
-            <div className="navbar-user">
-              <span className="navbar-user-name">
-                {authUser.first_name || authUser.email}
-              </span>
-              <button onClick={handleLogout} className="btn btn-ghost btn-sm">
-                Çıxış / Logout
-              </button>
-            </div>
+          {!isLoading && token ? (
+            <Link href="/dashboard" className="btn btn-auth">
+              Dashboard
+            </Link>
           ) : (
             <button
-              onClick={() => { setShowAuthModal(true); setAuthError(null); }}
+              onClick={() => setShowAuthModal(true)}
               className="btn btn-auth"
             >
               Daxil ol / Login
@@ -491,112 +83,32 @@ export default function Home() {
       </nav>
 
       {/* Auth Modal */}
-      {showAuthModal && (
-        <div className="auth-overlay" onClick={() => setShowAuthModal(false)}>
-          <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="auth-close" onClick={() => setShowAuthModal(false)}>
-              &#10005;
-            </button>
-            <h2 className="auth-title">
-              {authMode === "login" ? "Daxil ol / Login" : "Qeydiyyat / Register"}
-            </h2>
-            <form onSubmit={handleAuth}>
-              {authMode === "register" && (
-                <div className="form-group">
-                  <label className="form-label" htmlFor="auth-name">Ad / Name</label>
-                  <input
-                    id="auth-name"
-                    type="text"
-                    className="form-input"
-                    placeholder="Adınız"
-                    value={authFirstName}
-                    onChange={(e) => setAuthFirstName(e.target.value)}
-                  />
-                </div>
-              )}
-              <div className="form-group">
-                <label className="form-label" htmlFor="auth-email">Email</label>
-                <input
-                  id="auth-email"
-                  type="email"
-                  className="form-input"
-                  placeholder="email@example.com"
-                  value={authEmail}
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="auth-password">Şifrə / Password</label>
-                <input
-                  id="auth-password"
-                  type="password"
-                  className="form-input"
-                  placeholder="Minimum 6 simvol"
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
-              <button type="submit" disabled={authLoading} className="btn btn-primary">
-                {authLoading
-                  ? "Gözləyin..."
-                  : authMode === "login"
-                    ? "Daxil ol / Login"
-                    : "Qeydiyyat / Register"}
-              </button>
-            </form>
-            {authError && <div className="alert-msg alert-msg-error">{authError}</div>}
-            <div className="auth-switch">
-              {authMode === "login" ? (
-                <>
-                  Hesabınız yoxdur?{" "}
-                  <button
-                    type="button"
-                    className="auth-switch-btn"
-                    onClick={() => { setAuthMode("register"); setAuthError(null); }}
-                  >
-                    Qeydiyyatdan keçin / Register
-                  </button>
-                </>
-              ) : (
-                <>
-                  Artıq hesabınız var?{" "}
-                  <button
-                    type="button"
-                    className="auth-switch-btn"
-                    onClick={() => { setAuthMode("login"); setAuthError(null); }}
-                  >
-                    Daxil olun / Login
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
+      />
 
       {/* Hero */}
       <section className="hero">
         <div className="animate-fade-in-up delay-1">
           <span className="hero-badge">
             <span>&#9889;</span>
-            Azərbaycanın qiymət izləyicisi
+            Az&#601;rbaycanın qiym&#601;t izl&#601;yicisi
           </span>
         </div>
 
         <h1 className="hero-title animate-fade-in-up delay-2">
           <span className="hero-title-gradient">
-            Ən ucuz qiyməti tapın,
+            &#399;n ucuz qiym&#601;ti tapın,
           </span>
           <br />
-          pul qənaət edin
+          pul q&#601;na&#601;t edin
         </h1>
 
         <p className="hero-description animate-fade-in-up delay-3">
-          UcuzBot Azərbaycanın 6 böyük mağazasında qiymətləri avtomatik izləyir.
-          İstədiyiniz məhsulun qiymətini təyin edin — qiymət düşən kimi sizə bildiriş göndərək.
+          UcuzBot Az&#601;rbaycanın 6 b&#246;y&#252;k ma&#287;azasında qiym&#601;tl&#601;ri avtomatik izl&#601;yir.
+          İst&#601;diyiniz m&#601;hsulun qiym&#601;tini t&#601;yin edin — qiym&#601;t d&#252;&#351;&#601;n kimi siz&#601; bildiri&#351; g&#246;nd&#601;r&#601;k.
         </p>
         <p className="hero-description-en animate-fade-in-up delay-3">
           UcuzBot automatically tracks prices across 6 major Azerbaijan stores.
@@ -606,7 +118,7 @@ export default function Home() {
         <div className="hero-stats animate-fade-in-up delay-4">
           <div className="hero-stat">
             <div className="hero-stat-number">6</div>
-            <div className="hero-stat-label">Mağaza / Stores</div>
+            <div className="hero-stat-label">Ma&#287;aza / Stores</div>
           </div>
           <div className="hero-stat">
             <div className="hero-stat-number">24/7</div>
@@ -614,7 +126,7 @@ export default function Home() {
           </div>
           <div className="hero-stat">
             <div className="hero-stat-number">&#8380;</div>
-            <div className="hero-stat-label">AZN ilə / Prices in AZN</div>
+            <div className="hero-stat-label">AZN il&#601; / Prices in AZN</div>
           </div>
         </div>
       </section>
@@ -624,8 +136,8 @@ export default function Home() {
       {/* How It Works */}
       <section className="section">
         <div className="section-header animate-fade-in-up delay-1">
-          <div className="section-label">Necə işləyir / How it works</div>
-          <h2 className="section-title">3 sadə addım ilə başlayın</h2>
+          <div className="section-label">Nec&#601; i&#351;l&#601;yir / How it works</div>
+          <h2 className="section-title">3 sad&#601; addım il&#601; ba&#351;layın</h2>
           <p className="section-subtitle">Get started in 3 simple steps</p>
         </div>
 
@@ -633,27 +145,27 @@ export default function Home() {
           <div className="step-card animate-fade-in-up delay-2">
             <span className="step-number">1</span>
             <span className="step-icon">&#128270;</span>
-            <div className="step-title">Bildirişləri aktivləşdirin</div>
+            <div className="step-title">Bildiri&#351;l&#601;ri aktivl&#601;&#351;dirin</div>
             <div className="step-desc">
-              Brauzerdə bildirişlərə icazə verin ki, qiymət düşəndə anında xəbər alasınız.
+              Brauzerd&#601; bildiri&#351;l&#601;r&#601; icaz&#601; verin ki, qiym&#601;t d&#252;&#351;&#601;nd&#601; anında x&#601;b&#601;r alasınız.
             </div>
             <div className="step-desc-en">Enable browser notifications to get instant price drop alerts.</div>
           </div>
           <div className="step-card animate-fade-in-up delay-3">
             <span className="step-number">2</span>
             <span className="step-icon">&#127919;</span>
-            <div className="step-title">Hədəf qiymət təyin edin</div>
+            <div className="step-title">H&#601;d&#601;f qiym&#601;t t&#601;yin edin</div>
             <div className="step-desc">
-              Axtardığınız məhsulu yazın, hədəf qiyməti daxil edin və mağazaları seçin.
+              Axtardı&#287;ınız m&#601;hsulu yazın, h&#601;d&#601;f qiym&#601;ti daxil edin v&#601; ma&#287;azaları se&#231;in.
             </div>
             <div className="step-desc-en">Enter the product, set your target price, and pick stores.</div>
           </div>
           <div className="step-card animate-fade-in-up delay-4">
             <span className="step-number">3</span>
             <span className="step-icon">&#128276;</span>
-            <div className="step-title">Bildiriş alın</div>
+            <div className="step-title">Bildiri&#351; alın</div>
             <div className="step-desc">
-              Qiymət hədəfinizə çatanda və ya aşağı düşəndə dərhal bildiriş alacaqsınız.
+              Qiym&#601;t h&#601;d&#601;finiz&#601; &#231;atanda v&#601; ya a&#351;a&#287;ı d&#252;&#351;&#601;nd&#601; d&#601;rhal bildiri&#351; alacaqsınız.
             </div>
             <div className="step-desc-en">Get notified instantly when the price hits your target.</div>
           </div>
@@ -665,17 +177,17 @@ export default function Home() {
       {/* Instructions */}
       <section className="section">
         <div className="section-header animate-fade-in-up delay-1">
-          <div className="section-label">Təlimatlar / Instructions</div>
-          <h2 className="section-title">İstifadə qaydası</h2>
+          <div className="section-label">T&#601;limatlar / Instructions</div>
+          <h2 className="section-title">İstifad&#601; qaydası</h2>
           <p className="section-subtitle">How to use UcuzBot</p>
         </div>
 
         <div className="instructions-grid">
           <div className="instruction-card animate-fade-in-up delay-2">
             <div className="instruction-icon">&#128270;</div>
-            <div className="instruction-title">Məhsul Axtarışı / Product Search</div>
+            <div className="instruction-title">M&#601;hsul Axtarı&#351;ı / Product Search</div>
             <div className="instruction-text">
-              Aşağıdakı axtarış bölməsində məhsul adınızı yazın. Bütün mağazalarda canlı qiymətləri görəcəksiniz.
+              A&#351;a&#287;ıdakı axtarı&#351; b&#246;lm&#601;sind&#601; m&#601;hsul adınızı yazın. B&#252;t&#252;n ma&#287;azalarda canlı qiym&#601;tl&#601;ri g&#246;r&#601;c&#601;ksiniz.
             </div>
             <div className="instruction-text-en">
               Type your product name in the search section below. You will see live prices from all stores.
@@ -683,9 +195,9 @@ export default function Home() {
           </div>
           <div className="instruction-card animate-fade-in-up delay-3">
             <div className="instruction-icon">&#128276;</div>
-            <div className="instruction-title">Qiymət Alertləri / Price Alerts</div>
+            <div className="instruction-title">Qiym&#601;t Alertl&#601;ri / Price Alerts</div>
             <div className="instruction-text">
-              Hədəf qiymət təyin edin. Sistem hər 4 saatdan bir qiymətləri yoxlayır və qiymət düşəndə sizə xəbər verir.
+              H&#601;d&#601;f qiym&#601;t t&#601;yin edin. Sistem h&#601;r 4 saatdan bir qiym&#601;tl&#601;ri yoxlayır v&#601; qiym&#601;t d&#252;&#351;&#601;nd&#601; siz&#601; x&#601;b&#601;r verir.
             </div>
             <div className="instruction-text-en">
               Set a target price. The system checks prices every 4 hours and notifies you when the price drops.
@@ -695,7 +207,7 @@ export default function Home() {
             <div className="instruction-icon">&#128100;</div>
             <div className="instruction-title">Hesab / Account</div>
             <div className="instruction-text">
-              Qeydiyyatdan keçin ki, alertləriniz bütün cihazlarda sinxron olsun. Qeydiyyatsız da bildiriş ilə işləyə bilərsiniz.
+              Qeydiyyatdan ke&#231;in ki, alertl&#601;riniz b&#252;t&#252;n cihazlarda sinxron olsun. Qeydiyyatsız da bildiri&#351; il&#601; i&#351;l&#601;y&#601; bil&#601;rsiniz.
             </div>
             <div className="instruction-text-en">
               Register to sync alerts across devices. You can also use push notifications without an account.
@@ -708,7 +220,7 @@ export default function Home() {
               <a href="https://t.me/UcuzBot" target="_blank" rel="noopener noreferrer" className="instruction-link">
                 @UcuzBot
               </a>
-              {" "}ilə Telegram-dan da istifadə edə bilərsiniz. Mesaj yazın — avtomatik axtarış edəcək.
+              {" "}il&#601; Telegram-dan da istifad&#601; ed&#601; bil&#601;rsiniz. Mesaj yazın — avtomatik axtarı&#351; ed&#601;c&#601;k.
             </div>
             <div className="instruction-text-en">
               You can also use{" "}
@@ -726,8 +238,8 @@ export default function Home() {
       {/* Stores */}
       <section className="section">
         <div className="section-header animate-fade-in-up delay-1">
-          <div className="section-label">Mağazalar / Stores</div>
-          <h2 className="section-title">Dəstəklənən mağazalar</h2>
+          <div className="section-label">Ma&#287;azalar / Stores</div>
+          <h2 className="section-title">D&#601;st&#601;kl&#601;n&#601;n ma&#287;azalar</h2>
           <p className="section-subtitle">We track prices from these stores</p>
         </div>
 
@@ -752,8 +264,8 @@ export default function Home() {
       {/* Product Search */}
       <section className="section" id="search">
         <div className="section-header animate-fade-in-up delay-1">
-          <div className="section-label">Məhsul Axtarışı / Product Search</div>
-          <h2 className="section-title">Qiymətləri müqayisə edin</h2>
+          <div className="section-label">M&#601;hsul Axtarı&#351;ı / Product Search</div>
+          <h2 className="section-title">Qiym&#601;tl&#601;ri m&#252;qayis&#601; edin</h2>
           <p className="section-subtitle">Compare prices across all stores</p>
         </div>
 
@@ -762,7 +274,7 @@ export default function Home() {
             <input
               type="text"
               className="form-input search-input"
-              placeholder="məs. iPhone 15, Samsung Galaxy, AirPods..."
+              placeholder="m&#601;s. iPhone 15, Samsung Galaxy, AirPods..."
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
               maxLength={500}
@@ -803,7 +315,7 @@ export default function Home() {
 
           {hasSearched && !searchLoading && searchResults.length === 0 && !searchError && (
             <div className="search-no-results">
-              Nəticə tapılmadı / No results found
+              N&#601;tic&#601; tapılmadı / No results found
             </div>
           )}
         </div>
@@ -811,258 +323,22 @@ export default function Home() {
 
       <div className="section-divider" />
 
-      {/* Alert Form */}
-      <section className="form-section" id="create-alert">
-        <div className="section-header animate-fade-in-up delay-1">
-          <div className="section-label">Qiymət Alerti / Price Alert</div>
-          <h2 className="section-title">Alert yaradın</h2>
-          <p className="section-subtitle">Create a price alert and save money</p>
-        </div>
-
-        <div className="form-wrapper animate-fade-in-up delay-2">
-          {/* Push Notification Banner — only show if not authenticated */}
-          {!authToken && pushSupported && (
-            <div className={`push-banner ${pushSubscribed ? "push-banner-active" : ""}`}>
-              <div className="push-banner-icon">{pushSubscribed ? "\u2705" : "\u{1F514}"}</div>
-              {!pushSubscribed ? (
-                <>
-                  <div className="push-banner-text">
-                    <strong>Bildirişləri aktivləşdirin</strong>
-                    <br />
-                    Alert yaratmaq üçün bildirişlərə icazə lazımdır və ya daxil olun.
-                    <br />
-                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                      Enable notifications or login to create price alerts.
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleSubscribe}
-                    disabled={pushLoading}
-                    className="btn btn-notify"
-                  >
-                    {pushLoading
-                      ? "Gözləyin..."
-                      : "Bildirişləri aktivləşdir"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="push-active-text">
-                    Bildirişlər aktivdir / Notifications enabled
-                  </div>
-                  <button
-                    onClick={handleUnsubscribe}
-                    disabled={pushLoading}
-                    className="btn btn-ghost"
-                  >
-                    Söndür / Disable
-                  </button>
-                </>
-              )}
-              {pushError && <div className="push-error">{pushError}</div>}
-            </div>
-          )}
-
-          {authToken && (
-            <div className="push-banner push-banner-active">
-              <div className="push-banner-icon">{"\u2705"}</div>
-              <div className="push-active-text">
-                Daxil olmusunuz — alert yarada bilərsiniz / Logged in — you can create alerts
-              </div>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleCreateAlert}>
-            <div className="form-group">
-              <label className="form-label" htmlFor="product-name">
-                Məhsul adı / Product name
-              </label>
-              <input
-                id="product-name"
-                type="text"
-                className="form-input"
-                placeholder="məs. iPhone 15 Pro Max"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                maxLength={500}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="target-price">
-                Hədəf qiymət / Target price
-              </label>
-              <div className="form-input-suffix">
-                <input
-                  id="target-price"
-                  type="number"
-                  className="form-input"
-                  placeholder="məs. 1500"
-                  value={targetPrice}
-                  onChange={(e) => setTargetPrice(e.target.value)}
-                  min="0.01"
-                  step="0.01"
-                />
-                <span className="suffix">AZN</span>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">
-                Mağazalar / Stores
-              </label>
-              <div className="store-chips">
-                {stores.map((store) => (
-                  <div
-                    key={store.slug}
-                    className={`store-chip ${selectedStores.includes(store.slug) ? "active" : ""}`}
-                    onClick={() => toggleStore(store.slug)}
-                  >
-                    <span className="store-chip-check">
-                      {selectedStores.includes(store.slug) ? "\u2713" : ""}
-                    </span>
-                    {store.name}
-                  </div>
-                ))}
-              </div>
-              <button type="button" className="store-select-all" onClick={toggleAllStores}>
-                {selectedStores.length === stores.length ? "Hamısını silin / Deselect all" : "Hamısını seçin / Select all"}
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              disabled={alertLoading || !canCreateAlert}
-              className="btn btn-primary"
-            >
-              {alertLoading ? "Yaradılır..." : "Alert Yarat / Create Alert"}
-            </button>
-          </form>
-
-          {alertStatus && (
-            <div className={`alert-msg alert-msg-${alertStatus.type}`}>
-              {alertStatus.message}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* My Alerts */}
-      {showAlerts && (
-        <>
-          <div className="section-divider" />
-          <section className="section">
-            <div className="section-header">
-              <div className="section-label">Alertlərim / My Alerts</div>
-              <h2 className="section-title">Aktiv alertlər</h2>
-              <p className="section-subtitle">Your price alerts and their current status</p>
-            </div>
-
-            <div className="my-alerts-list">
-              {myAlerts.map((alert) => {
-                const storeName = stores.find(
-                  (s) => s.slug === alert.lowest_price_store
-                )?.name || alert.lowest_price_store;
-                return (
-                  <div key={alert.id} className={`my-alert-card ${alert.is_triggered ? "my-alert-triggered" : ""}`}>
-                    <div className="my-alert-header">
-                      <div className="my-alert-query">{alert.search_query}</div>
-                      <div className="my-alert-actions">
-                        <button
-                          className="my-alert-check"
-                          onClick={() => handleCheckNow(alert.id)}
-                          disabled={checkingAlertId === alert.id}
-                          title="İndi yoxla / Check now"
-                        >
-                          {checkingAlertId === alert.id ? "\u23F3" : "\u{1F504}"}
-                        </button>
-                        <button
-                          className="my-alert-delete"
-                          onClick={() => handleDeleteAlert(alert.id)}
-                          title="Sil / Delete"
-                        >
-                          &#10005;
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Store tags */}
-                    <div className="my-alert-stores">
-                      {alert.store_slugs.map((slug) => {
-                        const s = stores.find((st) => st.slug === slug);
-                        return (
-                          <span key={slug} className="my-alert-store-tag">
-                            {s?.name || slug}
-                          </span>
-                        );
-                      })}
-                    </div>
-
-                    <div className="my-alert-details">
-                      <div className="my-alert-row">
-                        <span className="my-alert-label">Hədəf / Target:</span>
-                        <span className="my-alert-value">{alert.target_price} AZN</span>
-                      </div>
-                      {alert.lowest_price_found !== null && (
-                        <div className="my-alert-row">
-                          <span className="my-alert-label">Ən aşağı / Lowest:</span>
-                          <span className={`my-alert-value ${
-                            alert.lowest_price_found <= alert.target_price
-                              ? "my-alert-price-hit"
-                              : "my-alert-price-above"
-                          }`}>
-                            {alert.lowest_price_found} AZN
-                          </span>
-                        </div>
-                      )}
-                      {storeName && alert.lowest_price_found !== null && (
-                        <div className="my-alert-row">
-                          <span className="my-alert-label">Mağaza / Store:</span>
-                          <span className="my-alert-value">
-                            {alert.lowest_price_url ? (
-                              <a href={alert.lowest_price_url} target="_blank" rel="noopener noreferrer" className="my-alert-link">
-                                {storeName}
-                              </a>
-                            ) : storeName}
-                          </span>
-                        </div>
-                      )}
-                      {alert.last_checked_at && (
-                        <div className="my-alert-row">
-                          <span className="my-alert-label">Yoxlanılıb / Checked:</span>
-                          <span className="my-alert-value my-alert-time">
-                            {new Date(alert.last_checked_at).toLocaleString("az-AZ")}
-                          </span>
-                        </div>
-                      )}
-                      {!alert.last_checked_at && (
-                        <div className="my-alert-checking">Qiymətlər yoxlanılır... / Checking prices...</div>
-                      )}
-                    </div>
-                    {alert.is_triggered && (
-                      <div className="my-alert-triggered-badge">Tapıldı! / Price hit!</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {alertsLoading && <div className="my-alerts-loading">Yüklənir... / Loading...</div>}
-          </section>
-        </>
-      )}
-
       {/* Footer */}
       <footer className="footer">
         <div className="footer-logo">UcuzBot</div>
         <div className="footer-text">
-          Azərbaycanda ən yaxşı qiymətləri izləyin
+          Az&#601;rbaycanda &#601;n yaxşı qiym&#601;tl&#601;ri izl&#601;yin
           &bull; Track the best prices in Azerbaijan
         </div>
         <div className="footer-links">
-          <a href="#search" className="footer-link">Axtarış / Search</a>
-          <a href="#create-alert" className="footer-link">Alert Yarat / Create Alert</a>
+          <a href="#search" className="footer-link">Axtarı&#351; / Search</a>
+          {token ? (
+            <Link href="/dashboard/alerts/create" className="footer-link">Alert Yarat / Create Alert</Link>
+          ) : (
+            <button onClick={() => setShowAuthModal(true)} className="footer-link" style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-main)" }}>
+              Alert Yarat / Create Alert
+            </button>
+          )}
           <a
             href="https://t.me/UcuzBot"
             target="_blank"
