@@ -1,0 +1,44 @@
+services:
+  backend:
+    volumes: []
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  bot:
+    volumes: []
+    profiles:
+      - telegram
+
+  celery_worker:
+    volumes: []
+
+  frontend:
+    volumes: []
+    command: npm start
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NODE_ENV=production
+
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
