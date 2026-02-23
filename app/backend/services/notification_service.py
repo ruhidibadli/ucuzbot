@@ -132,12 +132,12 @@ async def send_push_alerts_for_alert(
     price: Decimal,
     store_name: str,
     product_url: str,
+    session=None,
 ) -> int:
     """Send push notifications for an alert.
     Sends to: the alert's direct push subscription + all user's active subscriptions.
-    Returns count of successfully sent notifications."""
+    If session is provided, uses it; otherwise creates one from the module-level factory."""
     from sqlalchemy import select, or_
-    from app.backend.db.base import async_session_factory
 
     conditions = []
     if alert.user_id is not None:
@@ -148,14 +148,21 @@ async def send_push_alerts_for_alert(
     if not conditions:
         return 0
 
-    async with async_session_factory() as session:
-        result = await session.execute(
+    async def _query(s):
+        result = await s.execute(
             select(PushSubscription).where(
                 or_(*conditions),
                 PushSubscription.is_active == True,  # noqa: E712
             )
         )
-        subscriptions = result.scalars().all()
+        return result.scalars().all()
+
+    if session is not None:
+        subscriptions = await _query(session)
+    else:
+        from app.backend.db.base import async_session_factory
+        async with async_session_factory() as s:
+            subscriptions = await _query(s)
 
     # Deduplicate by endpoint
     seen_endpoints: set[str] = set()

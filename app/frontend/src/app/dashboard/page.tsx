@@ -1,29 +1,42 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchAlerts } from "@/lib/api";
+import { fetchAlerts, deleteAlert, checkAlertNow } from "@/lib/api";
 import type { AlertData } from "@/lib/types";
 import AlertCard from "@/components/AlertCard";
-import { deleteAlert, checkAlertNow } from "@/lib/api";
+
+const POLL_INTERVAL = 30_000;
 
 export default function DashboardPage() {
   const { token } = useAuth();
   const [alerts, setAlerts] = useState<AlertData[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingAlertId, setCheckingAlertId] = useState<number | null>(null);
+  const checkPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const loadAlerts = useCallback(async () => {
+  const loadAlerts = useCallback(async (showLoading = false) => {
     if (!token) return;
-    setLoading(true);
-    const data = await fetchAlerts(token);
-    setAlerts(data);
-    setLoading(false);
+    if (showLoading) setLoading(true);
+    try {
+      const data = await fetchAlerts(token);
+      setAlerts(data);
+    } catch {
+      // Network error during polling — ignore silently
+    }
+    if (showLoading) setLoading(false);
   }, [token]);
 
+  // Initial load
   useEffect(() => {
-    loadAlerts();
+    loadAlerts(true);
+  }, [loadAlerts]);
+
+  // Auto-poll every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => loadAlerts(), POLL_INTERVAL);
+    return () => clearInterval(interval);
   }, [loadAlerts]);
 
   async function handleDelete(id: number) {
@@ -36,8 +49,14 @@ export default function DashboardPage() {
   async function handleCheckNow(id: number) {
     setCheckingAlertId(id);
     await checkAlertNow(token, id);
-    setTimeout(loadAlerts, 10000);
-    setTimeout(() => setCheckingAlertId(null), 2000);
+
+    if (checkPollRef.current) clearInterval(checkPollRef.current);
+    checkPollRef.current = setInterval(() => loadAlerts(), 5_000);
+    setTimeout(() => {
+      if (checkPollRef.current) clearInterval(checkPollRef.current);
+      checkPollRef.current = null;
+      setCheckingAlertId(null);
+    }, 60_000);
   }
 
   const total = alerts.length;

@@ -1,7 +1,12 @@
 import asyncio
+from datetime import datetime, timezone
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import selectinload
+
+from app.backend.core.config import settings
 from app.backend.core.logging import get_logger
-from app.backend.db.base import async_session_factory, engine
 from app.backend.models.alert import Alert
 from app.backend.services.alert_service import get_all_active_alerts
 from app.backend.services.notification_service import send_price_alert, send_push_alerts_for_alert
@@ -13,64 +18,76 @@ from app.shared.constants import STORE_CONFIGS
 logger = get_logger(__name__)
 
 
+def _make_session_factory() -> tuple:
+    """Create a fresh engine + session factory for each task invocation.
+    This avoids stale connections across asyncio.run() calls in Celery."""
+    task_engine = create_async_engine(
+        settings.database_url, echo=False, pool_pre_ping=True, pool_size=2, max_overflow=0
+    )
+    factory = async_sessionmaker(task_engine, class_=AsyncSession, expire_on_commit=False)
+    return task_engine, factory
+
+
 async def _check_single_alert(alert_id: int) -> None:
-    await engine.dispose()
-    async with async_session_factory() as session:
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
+    task_engine, session_factory = _make_session_factory()
+    try:
+        async with session_factory() as session:
+            result = await session.execute(
+                select(Alert).options(selectinload(Alert.user)).where(Alert.id == alert_id)
+            )
+            alert = result.scalar_one_or_none()
+            if not alert or not alert.is_active or alert.is_triggered:
+                return
 
-        result = await session.execute(
-            select(Alert).options(selectinload(Alert.user)).where(Alert.id == alert_id)
-        )
-        alert = result.scalar_one_or_none()
-        if not alert or not alert.is_active or alert.is_triggered:
-            return
+            products = await search_stores_for_alert(alert.search_query, alert.store_slugs)
+            alert.last_checked_at = datetime.now(timezone.utc)
 
-        from datetime import datetime, timezone
+            if not products:
+                logger.info("no_products_found", alert_id=alert.id)
+                await session.commit()
+                return
 
-        products = await search_stores_for_alert(alert.search_query, alert.store_slugs)
-        alert.last_checked_at = datetime.now(timezone.utc)
+            await record_prices(session, alert, products)
 
-        if not products:
-            logger.info("no_products_found", alert_id=alert.id)
-            await session.commit()
-            return
+            lowest = products[0]  # Already sorted by price
+            if check_price_trigger(alert, lowest.price):
+                await mark_alert_triggered(session, alert)
+                store_config = STORE_CONFIGS.get(lowest.store_slug, {})
+                store_name = store_config.get("name", lowest.store_slug)
 
-        await record_prices(session, alert, products)
+                if alert.user and alert.user.telegram_id:
+                    await send_price_alert(
+                        telegram_id=alert.user.telegram_id,
+                        alert=alert,
+                        product_name=lowest.product_name,
+                        price=lowest.price,
+                        store_name=store_name,
+                        product_url=lowest.product_url,
+                    )
 
-        lowest = products[0]  # Already sorted by price
-        if check_price_trigger(alert, lowest.price):
-            await mark_alert_triggered(session, alert)
-            store_config = STORE_CONFIGS.get(lowest.store_slug, {})
-            store_name = store_config.get("name", lowest.store_slug)
-
-            if alert.user and alert.user.telegram_id:
-                await send_price_alert(
-                    telegram_id=alert.user.telegram_id,
+                # Send browser push notifications
+                await send_push_alerts_for_alert(
                     alert=alert,
                     product_name=lowest.product_name,
                     price=lowest.price,
                     store_name=store_name,
                     product_url=lowest.product_url,
+                    session=session,
                 )
 
-            # Send browser push notifications
-            await send_push_alerts_for_alert(
-                alert=alert,
-                product_name=lowest.product_name,
-                price=lowest.price,
-                store_name=store_name,
-                product_url=lowest.product_url,
-            )
-
-        await session.commit()
+            await session.commit()
+    finally:
+        await task_engine.dispose()
 
 
 async def _check_all_alerts() -> None:
-    await engine.dispose()
-    async with async_session_factory() as session:
-        alerts = await get_all_active_alerts(session)
-        alert_ids = [a.id for a in alerts]
+    task_engine, session_factory = _make_session_factory()
+    try:
+        async with session_factory() as session:
+            alerts = await get_all_active_alerts(session)
+            alert_ids = [a.id for a in alerts]
+    finally:
+        await task_engine.dispose()
 
     logger.info("price_check_started", total_alerts=len(alert_ids))
 

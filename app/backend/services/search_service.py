@@ -10,6 +10,21 @@ from app.shared.constants import StoreSlug
 logger = get_logger(__name__)
 
 
+async def _scrape_with_timeout(
+    scraper, query: str, max_results: int, timeout: float = 30.0
+) -> list[ScrapedProduct]:
+    try:
+        return await asyncio.wait_for(
+            scraper.safe_search(query, max_results), timeout=timeout
+        )
+    except asyncio.TimeoutError:
+        try:
+            await scraper.close()
+        except Exception:
+            pass
+        raise
+
+
 async def search_all_stores(
     query: str,
     store_slugs: list[str] | None = None,
@@ -24,7 +39,7 @@ async def search_all_stores(
     tasks = []
     for slug, scraper_cls in scrapers_to_use.items():
         scraper = scraper_cls()
-        tasks.append(scraper.safe_search(query, max_results_per_store))
+        tasks.append(_scrape_with_timeout(scraper, query, max_results_per_store))
 
     results_list = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -32,7 +47,10 @@ async def search_all_stores(
     errors: list[str] = []
 
     for slug, result in zip(scrapers_to_use.keys(), results_list):
-        if isinstance(result, Exception):
+        if isinstance(result, asyncio.TimeoutError):
+            errors.append(f"{slug}: timed out")
+            logger.warning("search_store_timeout", store=slug)
+        elif isinstance(result, Exception):
             errors.append(f"{slug}: {result}")
             logger.error("search_store_error", store=slug, error=str(result))
         elif isinstance(result, list):

@@ -9,6 +9,17 @@ import { searchProducts } from "@/lib/api";
 import type { SearchResult } from "@/lib/types";
 import AuthModal from "@/components/AuthModal";
 
+function notifySearchResults(query: string, count: number) {
+  if (typeof window === "undefined" || count === 0) return;
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("UcuzBot — Neticeler tapildi!", {
+      body: `"${query}" ucun ${count} neice / ${count} results for "${query}"`,
+      icon: "/icon-192.png",
+      tag: "ucuzbot-search",
+    });
+  }
+}
+
 export default function Home() {
   const { user, token, isLoading } = useAuth();
   const router = useRouter();
@@ -24,12 +35,19 @@ export default function Home() {
   async function handleProductSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!productSearch.trim()) return;
+
+    // Request permission on user gesture (browsers block it outside of clicks)
+    if ("Notification" in window && Notification.permission === "default") {
+      await Notification.requestPermission();
+    }
+
     setSearchLoading(true);
     setSearchError(null);
     setHasSearched(true);
     try {
       const data = await searchProducts(productSearch.trim());
       setSearchResults(data);
+      notifySearchResults(productSearch.trim(), data.length);
     } catch (err: unknown) {
       setSearchError(err instanceof Error ? err.message : "Search failed");
       setSearchResults([]);

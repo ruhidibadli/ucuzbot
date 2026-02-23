@@ -5,6 +5,17 @@ import Link from "next/link";
 import { searchProducts } from "@/lib/api";
 import type { SearchResult } from "@/lib/types";
 
+function notifySearchResults(query: string, count: number) {
+  if (typeof window === "undefined" || count === 0) return;
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("UcuzBot — Neticeler tapildi!", {
+      body: `"${query}" ucun ${count} neice / ${count} results for "${query}"`,
+      icon: "/icon-192.png",
+      tag: "ucuzbot-search",
+    });
+  }
+}
+
 export default function DashboardSearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -15,12 +26,19 @@ export default function DashboardSearchPage() {
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
+
+    // Request permission on user gesture (browsers block it outside of clicks)
+    if ("Notification" in window && Notification.permission === "default") {
+      await Notification.requestPermission();
+    }
+
     setLoading(true);
     setError(null);
     setHasSearched(true);
     try {
       const data = await searchProducts(query.trim());
       setResults(data);
+      notifySearchResults(query.trim(), data.length);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Search failed");
       setResults([]);

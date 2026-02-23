@@ -8,7 +8,7 @@ import { stores, API_BASE, urlBase64ToUint8Array } from "@/lib/constants";
 import StoreChips from "@/components/StoreChips";
 
 export default function CreateAlertPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -72,16 +72,20 @@ export default function CreateAlertPage() {
       });
 
       const subJSON = sub.toJSON();
+      const subscribeBody: Record<string, unknown> = {
+        endpoint: subJSON.endpoint,
+        keys: {
+          p256dh: subJSON.keys?.p256dh,
+          auth: subJSON.keys?.auth,
+        },
+      };
+      if (user?.id) {
+        subscribeBody.user_id = user.id;
+      }
       const saveRes = await fetch(`${API_BASE}/push/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: subJSON.endpoint,
-          keys: {
-            p256dh: subJSON.keys?.p256dh,
-            auth: subJSON.keys?.auth,
-          },
-        }),
+        body: JSON.stringify(subscribeBody),
       });
       if (!saveRes.ok) throw new Error("Failed to save subscription");
 
@@ -186,19 +190,29 @@ export default function CreateAlertPage() {
       </div>
 
       <div className="form-wrapper">
-        {/* Push Notification Banner -- only show if not authenticated */}
-        {!token && pushSupported && (
-          <div className={`push-banner ${pushSubscribed ? "push-banner-active" : ""}`}>
-            <div className="push-banner-icon">{pushSubscribed ? "\u2705" : "\u{1F514}"}</div>
+        {/* Push Notification Banner — shown for ALL users */}
+        {pushSupported && (
+          <div className={`push-banner ${pushSubscribed || token ? "push-banner-active" : ""}`}>
+            <div className="push-banner-icon">
+              {pushSubscribed ? "\u2705" : token ? "\u{1F514}" : "\u{1F514}"}
+            </div>
             {!pushSubscribed ? (
               <>
                 <div className="push-banner-text">
-                  <strong>Bildirislerri aktivlesdirin</strong>
+                  <strong>
+                    {token
+                      ? "Brauzer bildirisleri / Browser notifications"
+                      : "Bildirislerri aktivlesdirin"}
+                  </strong>
                   <br />
-                  Alert yaratmaq ucun bildirislere icaze lazimdir ve ya daxil olun.
+                  {token
+                    ? "Qiymet dusende brauzerden bildiris almaq ucun aktivlesdirin."
+                    : "Alert yaratmaq ucun bildirislere icaze lazimdir ve ya daxil olun."}
                   <br />
                   <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                    Enable notifications or login to create price alerts.
+                    {token
+                      ? "Enable to get browser notifications when prices drop."
+                      : "Enable notifications or login to create price alerts."}
                   </span>
                 </div>
                 <button
@@ -212,7 +226,9 @@ export default function CreateAlertPage() {
             ) : (
               <>
                 <div className="push-active-text">
-                  Bildirislr aktivdir / Notifications enabled
+                  {token
+                    ? "Daxil olmusunuz + Bildirislr aktivdir / Logged in + Notifications enabled"
+                    : "Bildirislr aktivdir / Notifications enabled"}
                 </div>
                 <button
                   onClick={handleUnsubscribe}
@@ -227,7 +243,7 @@ export default function CreateAlertPage() {
           </div>
         )}
 
-        {token && (
+        {token && !pushSupported && (
           <div className="push-banner push-banner-active">
             <div className="push-banner-icon">{"\u2705"}</div>
             <div className="push-active-text">
