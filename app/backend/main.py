@@ -19,9 +19,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
+_cors_origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:80",
+    "https://ucuzbot.az",
+    "https://www.ucuzbot.az",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

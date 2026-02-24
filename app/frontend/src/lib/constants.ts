@@ -6,7 +6,7 @@ export const stores = [
   { slug: "irshad", name: "Irshad", type: "Elektronika", icon: "\u{1F4F1}" },
   { slug: "maxi", name: "Maxi.az", type: "Marketplace", icon: "\u{1F6D2}" },
   { slug: "tap_az", name: "Tap.az", type: "Elanlar", icon: "\u{1F4CB}" },
-  { slug: "umico", name: "Umico", type: "Marketplace", icon: "\u{1F381}" },
+  { slug: "umico", name: "Birmarket", type: "Marketplace", icon: "\u{1F381}" },
 ];
 
 export function urlBase64ToUint8Array(base64String: string): ArrayBuffer {

@@ -1,10 +1,14 @@
 from urllib.parse import quote_plus
 
+import httpx
 from bs4 import BeautifulSoup
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.backend.scrapers.base import BaseScraper, ScrapedProduct
 from app.backend.scrapers.registry import scraper_registry
+from app.backend.core.config import settings
 from app.backend.core.logging import get_logger
+from app.shared.constants import DEFAULT_HEADERS
 
 logger = get_logger(__name__)
 
@@ -14,6 +18,14 @@ class MaxiScraper(BaseScraper):
     store_slug = "maxi"
     store_name = "Maxi.az"
     base_url = "https://maxi.az"
+
+    @retry(stop=stop_after_attempt(1), reraise=True)
+    async def _get_page(self, url: str) -> str:
+        """Override base _get_page with single attempt and shorter timeout."""
+        client = await self._get_client()
+        response = await client.get(url, timeout=10)
+        response.raise_for_status()
+        return response.text
 
     async def search(self, query: str, max_results: int = 10) -> list[ScrapedProduct]:
         url = f"{self.base_url}/axtaris?q={quote_plus(query)}"
