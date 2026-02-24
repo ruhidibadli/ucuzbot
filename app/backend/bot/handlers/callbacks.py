@@ -18,6 +18,7 @@ from app.backend.bot.keyboards import (
 )
 from app.backend.core.exceptions import AlertLimitReached
 from app.backend.db.base import async_session_factory
+from app.backend.models.bot_activity import log_bot_activity
 from app.backend.services.alert_service import (
     create_alert,
     delete_alert,
@@ -166,6 +167,13 @@ async def _finalize_alert(callback: CallbackQuery, state: FSMContext, selected_s
         )
         try:
             alert = await create_alert(session, user, search_query, target_price, store_slugs)
+            await log_bot_activity(
+                session,
+                user_id=user.id,
+                telegram_id=callback.from_user.id,
+                action="alert_create",
+                detail=f"{search_query} \u2264 {target_price} AZN [{', '.join(store_slugs)}]",
+            )
             await session.commit()
             check_single_alert.delay(alert.id)
         except AlertLimitReached as e:
@@ -252,6 +260,13 @@ async def handle_alert_actions(callback: CallbackQuery):
         async with async_session_factory() as session:
             try:
                 await delete_alert(session, alert_id, callback.from_user.id)
+                await log_bot_activity(
+                    session,
+                    user_id=None,
+                    telegram_id=callback.from_user.id,
+                    action="alert_delete",
+                    detail=f"Alert #{alert_id}",
+                )
                 await session.commit()
                 await callback.message.edit_text(
                     f"\u2705 Alert #{alert_id} silindi / deleted",

@@ -58,3 +58,21 @@ class AdminAlertListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class AdminBotActivityItem(BaseModel):
+    id: int
+    user_id: int | None
+    telegram_id: int | None
+    user_email: str | None = None
+    user_first_name: str | None = None
+    action: str
+    detail: str | None
+    created_at: datetime
+
+
+class AdminBotActivityResponse(BaseModel):
+    activities: list[AdminBotActivityItem]
+    total: int
+    page: int
+    page_size: int

@@ -1,6 +1,7 @@
 import { API_BASE } from "./constants";
 import type {
   AdminAlertListResponse,
+  AdminBotActivityResponse,
   AdminStats,
   AdminUserListResponse,
   AlertData,
@@ -173,6 +174,24 @@ export async function fetchAdminAlerts(
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("Failed to fetch admin alerts");
+  return res.json();
+}
+
+export async function fetchAdminBotActivity(
+  token: string,
+  page = 1,
+  pageSize = 20,
+  actionFilter = "all"
+): Promise<AdminBotActivityResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+    action_filter: actionFilter,
+  });
+  const res = await fetch(`${API_BASE}/admin/bot-activity?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to fetch bot activity");
   return res.json();
 }
 

@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.backend.core.config import settings
 from app.backend.core.logging import get_logger
 from app.backend.models.alert import Alert
+from app.backend.models.bot_activity import log_bot_activity
 from app.backend.services.alert_service import get_all_active_alerts
 from app.backend.services.notification_service import send_price_alert, send_push_alerts_for_alert
 from app.backend.services.price_service import check_price_trigger, mark_alert_triggered, record_prices
@@ -54,6 +55,14 @@ async def _check_single_alert(alert_id: int) -> None:
                 await mark_alert_triggered(session, alert)
                 store_config = STORE_CONFIGS.get(lowest.store_slug, {})
                 store_name = store_config.get("name", lowest.store_slug)
+
+                await log_bot_activity(
+                    session,
+                    user_id=alert.user_id,
+                    telegram_id=alert.user.telegram_id if alert.user else None,
+                    action="alert_triggered",
+                    detail=f"{alert.search_query} \u2192 {lowest.price} AZN at {lowest.store_slug}",
+                )
 
                 if alert.user and alert.user.telegram_id:
                     await send_price_alert(

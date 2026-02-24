@@ -6,10 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backend.api.dependencies import get_admin_user, get_db
 from app.backend.models.alert import Alert
+from app.backend.models.bot_activity import BotActivity
 from app.backend.models.user import User
 from app.backend.schemas.admin import (
     AdminAlertListItem,
     AdminAlertListResponse,
+    AdminBotActivityItem,
+    AdminBotActivityResponse,
     AdminStatsResponse,
     AdminUserListItem,
     AdminUserListResponse,
@@ -189,3 +192,42 @@ async def admin_alerts(
         ))
 
     return AdminAlertListResponse(alerts=items, total=total, page=page, page_size=page_size)
+
+
+@router.get("/admin/bot-activity", response_model=AdminBotActivityResponse)
+async def admin_bot_activity(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    action_filter: str = Query("all", pattern="^(all|search|alert_create|alert_delete|alert_triggered)$"),
+    _admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    base = select(BotActivity).outerjoin(User, BotActivity.user_id == User.id)
+    count_base = select(func.count(BotActivity.id))
+
+    if action_filter != "all":
+        base = base.where(BotActivity.action == action_filter)
+        count_base = count_base.where(BotActivity.action == action_filter)
+
+    total = (await db.execute(count_base)).scalar_one()
+
+    offset = (page - 1) * page_size
+    base = base.add_columns(User.email, User.first_name)
+    rows = (await db.execute(
+        base.order_by(BotActivity.created_at.desc()).offset(offset).limit(page_size)
+    )).all()
+
+    items = []
+    for activity, user_email, user_first_name in rows:
+        items.append(AdminBotActivityItem(
+            id=activity.id,
+            user_id=activity.user_id,
+            telegram_id=activity.telegram_id,
+            user_email=user_email,
+            user_first_name=user_first_name,
+            action=activity.action,
+            detail=activity.detail,
+            created_at=activity.created_at,
+        ))
+
+    return AdminBotActivityResponse(activities=items, total=total, page=page, page_size=page_size)

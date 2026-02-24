@@ -6,12 +6,17 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
 
+from sqlalchemy import select
+
 from app.backend.bot.keyboards import (
     after_search_keyboard,
     cancel_inline_keyboard,
     no_results_keyboard,
     pagination_keyboard,
 )
+from app.backend.db.base import async_session_factory
+from app.backend.models.bot_activity import log_bot_activity
+from app.backend.models.user import User
 from app.backend.services.search_service import search_all_stores
 
 router = Router()
@@ -54,6 +59,25 @@ async def _execute_search(message: Message, query: str):
     wait_msg = await message.answer("\u23f3 Axtar\u0131l\u0131r... / Searching...")
 
     products, errors = await search_all_stores(query)
+
+    # Log search activity
+    try:
+        async with async_session_factory() as session:
+            telegram_id = message.from_user.id
+            result = await session.execute(
+                select(User.id).where(User.telegram_id == telegram_id)
+            )
+            uid = result.scalar_one_or_none()
+            await log_bot_activity(
+                session,
+                user_id=uid,
+                telegram_id=telegram_id,
+                action="search",
+                detail=f"{query} \u2192 {len(products)} results",
+            )
+            await session.commit()
+    except Exception:
+        pass
 
     if not products:
         error_text = ""

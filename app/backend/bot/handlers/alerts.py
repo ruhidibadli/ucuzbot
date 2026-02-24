@@ -16,6 +16,7 @@ from app.backend.bot.keyboards import (
 )
 from app.backend.core.exceptions import AlertLimitReached
 from app.backend.db.base import async_session_factory
+from app.backend.models.bot_activity import log_bot_activity
 from app.backend.services.alert_service import (
     create_alert,
     delete_alert,
@@ -136,6 +137,13 @@ async def cmd_delete(message: Message):
     async with async_session_factory() as session:
         try:
             await delete_alert(session, alert_id, message.from_user.id)
+            await log_bot_activity(
+                session,
+                user_id=None,
+                telegram_id=message.from_user.id,
+                action="alert_delete",
+                detail=f"Alert #{alert_id}",
+            )
             await session.commit()
             await message.answer(
                 f"\u2705 Alert #{alert_id} silindi / deleted",

@@ -89,3 +89,21 @@ export interface AdminAlertListResponse {
   page: number;
   page_size: number;
 }
+
+export interface AdminBotActivityItem {
+  id: number;
+  user_id: number | null;
+  telegram_id: number | null;
+  user_email: string | null;
+  user_first_name: string | null;
+  action: string;
+  detail: string | null;
+  created_at: string;
+}
+
+export interface AdminBotActivityResponse {
+  activities: AdminBotActivityItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}

@@ -3,12 +3,31 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchAdminStats } from "@/lib/api";
-import type { AdminStats } from "@/lib/types";
+import { fetchAdminStats, fetchAdminBotActivity } from "@/lib/api";
+import type { AdminStats, AdminBotActivityItem } from "@/lib/types";
+
+const ACTION_LABELS: Record<string, string> = {
+  search: "Search",
+  alert_create: "Alert Created",
+  alert_delete: "Alert Deleted",
+  alert_triggered: "Alert Triggered",
+};
+
+function formatTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export default function AdminOverviewPage() {
   const { token } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [recentActivity, setRecentActivity] = useState<AdminBotActivityItem[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -16,6 +35,9 @@ export default function AdminOverviewPage() {
     fetchAdminStats(token)
       .then(setStats)
       .catch(() => setError("Failed to load stats"));
+    fetchAdminBotActivity(token, 1, 20)
+      .then((res) => setRecentActivity(res.activities))
+      .catch(() => {});
   }, [token]);
 
   if (error) {
@@ -80,12 +102,40 @@ export default function AdminOverviewPage() {
         </div>
       )}
 
-      <div style={{ marginTop: "2rem", display: "flex", gap: "1rem" }}>
+      {recentActivity.length > 0 && (
+        <div style={{ marginTop: "2rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <h2 className="dashboard-recent-title" style={{ marginBottom: 0 }}>Recent Bot Activity</h2>
+            <Link href="/dashboard/admin/activity" className="btn btn-ghost btn-sm">
+              View All
+            </Link>
+          </div>
+          <div className="admin-activity-feed">
+            {recentActivity.map((item) => (
+              <div key={item.id} className="admin-activity-item">
+                <span className="admin-activity-time">{formatTimeAgo(item.created_at)}</span>
+                <span className="admin-activity-user">
+                  {item.user_first_name || item.user_email || (item.telegram_id ? `TG:${item.telegram_id}` : "Unknown")}
+                </span>
+                <span className={`admin-activity-badge admin-activity-badge--${item.action}`}>
+                  {ACTION_LABELS[item.action] || item.action}
+                </span>
+                {item.detail && <span className="admin-activity-detail">{item.detail}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: "2rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
         <Link href="/dashboard/admin/users" className="btn btn-primary" style={{ width: "auto" }}>
           View All Users
         </Link>
         <Link href="/dashboard/admin/alerts" className="btn btn-ghost">
           View All Alerts
+        </Link>
+        <Link href="/dashboard/admin/activity" className="btn btn-ghost">
+          Bot Activity Log
         </Link>
       </div>
     </div>
