@@ -4,10 +4,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backend.api.dependencies import get_current_user, get_db
 from app.backend.core.auth import create_jwt, hash_password, verify_password
+from app.backend.core.config import settings
 from app.backend.models.user import User
 from app.backend.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserProfile
 
 router = APIRouter()
+
+
+def _make_profile(user: User) -> UserProfile:
+    admin_email = settings.ADMIN_EMAIL.strip().lower()
+    is_admin = bool(admin_email and user.email and user.email.lower() == admin_email)
+    return UserProfile.model_validate(user).model_copy(update={"is_admin": is_admin})
 
 
 @router.post("/auth/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -30,7 +37,7 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     return AuthResponse(
         access_token=token,
-        user=UserProfile.model_validate(user),
+        user=_make_profile(user),
     )
 
 
@@ -49,10 +56,10 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     token = create_jwt(user.id)
     return AuthResponse(
         access_token=token,
-        user=UserProfile.model_validate(user),
+        user=_make_profile(user),
     )
 
 
 @router.get("/auth/me", response_model=UserProfile)
 async def me(user: User = Depends(get_current_user)):
-    return UserProfile.model_validate(user)
+    return _make_profile(user)

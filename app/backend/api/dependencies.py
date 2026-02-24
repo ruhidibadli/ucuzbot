@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backend.core.auth import decode_jwt
+from app.backend.core.config import settings
 from app.backend.core.security import rate_limiter
 from app.backend.db.base import get_session
 from app.backend.models.user import User
@@ -65,3 +66,12 @@ async def get_optional_user(
     user_id = int(payload["sub"])
     result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))  # noqa: E712
     return result.scalar_one_or_none()
+
+
+async def get_admin_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    admin_email = settings.ADMIN_EMAIL.strip().lower()
+    if not admin_email or not current_user.email or current_user.email.lower() != admin_email:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return current_user

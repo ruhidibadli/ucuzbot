@@ -1,5 +1,5 @@
 self.addEventListener("push", function (event) {
-  let data = { title: "UcuzBot", body: "Price alert!", url: "/" };
+  let data = { title: "UcuzaTap", body: "Price alert!", url: "/" };
   try {
     data = event.data.json();
   } catch (e) {

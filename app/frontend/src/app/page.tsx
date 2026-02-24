@@ -12,7 +12,7 @@ import AuthModal from "@/components/AuthModal";
 function notifySearchResults(query: string, count: number) {
   if (typeof window === "undefined" || count === 0) return;
   if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("UcuzBot — Neticeler tapildi!", {
+    new Notification("UcuzaTap — Neticeler tapildi!", {
       body: `"${query}" ucun ${count} neice / ${count} results for "${query}"`,
       icon: "/icon-192.png",
       tag: "ucuzbot-search",
@@ -70,12 +70,12 @@ export default function Home() {
       {/* Navbar */}
       <nav className="navbar">
         <div className="navbar-left">
-          <span className="navbar-logo">UcuzBot</span>
+          <span className="navbar-logo">UcuzaTap</span>
           <span className="navbar-tag">Beta</span>
         </div>
         <div className="navbar-right">
           <a
-            href="https://t.me/UcuzBot"
+            href="https://t.me/UcuzaTap_bot"
             target="_blank"
             rel="noopener noreferrer"
             className="navbar-telegram"
@@ -125,17 +125,17 @@ export default function Home() {
         </h1>
 
         <p className="hero-description animate-fade-in-up delay-3">
-          UcuzBot Az&#601;rbaycanın 6 b&#246;y&#252;k ma&#287;azasında qiym&#601;tl&#601;ri avtomatik izl&#601;yir.
+          UcuzaTap Az&#601;rbaycanın 5 b&#246;y&#252;k ma&#287;azasında qiym&#601;tl&#601;ri avtomatik izl&#601;yir.
           İst&#601;diyiniz m&#601;hsulun qiym&#601;tini t&#601;yin edin — qiym&#601;t d&#252;&#351;&#601;n kimi siz&#601; bildiri&#351; g&#246;nd&#601;r&#601;k.
         </p>
         <p className="hero-description-en animate-fade-in-up delay-3">
-          UcuzBot automatically tracks prices across 6 major Azerbaijan stores.
+          UcuzaTap automatically tracks prices across 5 major Azerbaijan stores.
           Set your target price for any product — we&apos;ll notify you the moment it drops.
         </p>
 
         <div className="hero-stats animate-fade-in-up delay-4">
           <div className="hero-stat">
-            <div className="hero-stat-number">6</div>
+            <div className="hero-stat-number">5</div>
             <div className="hero-stat-label">Ma&#287;aza / Stores</div>
           </div>
           <div className="hero-stat">
@@ -197,7 +197,7 @@ export default function Home() {
         <div className="section-header animate-fade-in-up delay-1">
           <div className="section-label">T&#601;limatlar / Instructions</div>
           <h2 className="section-title">İstifad&#601; qaydası</h2>
-          <p className="section-subtitle">How to use UcuzBot</p>
+          <p className="section-subtitle">How to use UcuzaTap</p>
         </div>
 
         <div className="instructions-grid">
@@ -235,15 +235,15 @@ export default function Home() {
             <div className="instruction-icon">&#128640;</div>
             <div className="instruction-title">Telegram Bot</div>
             <div className="instruction-text">
-              <a href="https://t.me/UcuzBot" target="_blank" rel="noopener noreferrer" className="instruction-link">
-                @UcuzBot
+              <a href="https://t.me/UcuzaTap_bot" target="_blank" rel="noopener noreferrer" className="instruction-link">
+                @UcuzaTap_bot
               </a>
               {" "}il&#601; Telegram-dan da istifad&#601; ed&#601; bil&#601;rsiniz. Mesaj yazın — avtomatik axtarı&#351; ed&#601;c&#601;k.
             </div>
             <div className="instruction-text-en">
               You can also use{" "}
-              <a href="https://t.me/UcuzBot" target="_blank" rel="noopener noreferrer" className="instruction-link">
-                @UcuzBot
+              <a href="https://t.me/UcuzaTap_bot" target="_blank" rel="noopener noreferrer" className="instruction-link">
+                @UcuzaTap_bot
               </a>
               {" "}on Telegram. Just type a product name — it searches automatically.
             </div>
@@ -343,7 +343,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="footer">
-        <div className="footer-logo">UcuzBot</div>
+        <div className="footer-logo">UcuzaTap</div>
         <div className="footer-text">
           Az&#601;rbaycanda &#601;n yaxşı qiym&#601;tl&#601;ri izl&#601;yin
           &bull; Track the best prices in Azerbaijan
@@ -358,7 +358,7 @@ export default function Home() {
             </button>
           )}
           <a
-            href="https://t.me/UcuzBot"
+            href="https://t.me/UcuzaTap_bot"
             target="_blank"
             rel="noopener noreferrer"
             className="footer-link"
@@ -367,7 +367,7 @@ export default function Home() {
           </a>
         </div>
         <div className="footer-text" style={{ marginTop: "0.5rem" }}>
-          &copy; {new Date().getFullYear()} ucuzbot.az
+          &copy; {new Date().getFullYear()} ucuzatap.az
         </div>
       </footer>
     </div>

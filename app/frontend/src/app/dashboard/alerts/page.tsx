@@ -14,7 +14,7 @@ const CHECK_POLL_DURATION = 60_000; // poll for 60 seconds after "Check Now"
 function showTriggeredNotification(alert: AlertData) {
   if (typeof window === "undefined") return;
   if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("UcuzBot — Qiymet dusdu! / Price drop!", {
+    new Notification("UcuzaTap — Qiymet dusdu! / Price drop!", {
       body: `${alert.search_query}\n${alert.lowest_price_found} AZN`,
       icon: "/icon-192.png",
       tag: `ucuzbot-triggered-${alert.id}`,

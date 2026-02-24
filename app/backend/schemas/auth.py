@@ -21,6 +21,7 @@ class UserProfile(BaseModel):
     language_code: str
     subscription_tier: str
     max_alerts: int
+    is_admin: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

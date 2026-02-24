@@ -18,7 +18,7 @@ export default function DashboardNav() {
   return (
     <nav className="dashboard-nav">
       <div className="dashboard-nav-left">
-        <Link href="/" className="navbar-logo">UcuzBot</Link>
+        <Link href="/" className="navbar-logo">UcuzaTap</Link>
         <div className="dashboard-nav-links">
           {navLinks.map((link) => (
             <Link
@@ -29,6 +29,14 @@ export default function DashboardNav() {
               {link.label}
             </Link>
           ))}
+          {user?.is_admin && (
+            <Link
+              href="/dashboard/admin"
+              className={`dashboard-nav-link ${pathname.startsWith("/dashboard/admin") ? "active" : ""}`}
+            >
+              Admin
+            </Link>
+          )}
         </div>
       </div>
       <div className="dashboard-nav-right">

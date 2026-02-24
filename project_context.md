@@ -79,7 +79,6 @@ D:\ucuzbot/
 │   │   │   ├── kontakt.py             # Kontakt Home (Magento 2 API + HTML fallback)
 │   │   │   ├── baku_electronics.py
 │   │   │   ├── irshad.py
-│   │   │   ├── maxi.py
 │   │   │   ├── tap_az.py
 │   │   │   └── umico.py
 │   │   ├── services/
@@ -270,7 +269,6 @@ After scraping, results pass through a relevance filter before being returned:
 | `kontakt` | Kontakt Home | KontaktScraper (Magento API + HTML) |
 | `baku_electronics` | Baku Electronics | BakuElectronicsScraper |
 | `irshad` | Irshad | IrshadScraper |
-| `maxi` | Maxi.az | MaxiScraper |
 | `tap_az` | Tap.az | TapAzScraper |
 | `umico` | Umico | UmicoScraper |
 

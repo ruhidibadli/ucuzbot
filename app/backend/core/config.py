@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     VAPID_PRIVATE_KEY: str = ""
     VAPID_CLAIMS_EMAIL: str = "mailto:admin@ucuzbot.az"
 
+    # Admin
+    ADMIN_EMAIL: str = ""
+
     @property
     def database_url(self) -> str:
         return (

@@ -72,17 +72,3 @@ def umico_html():
     """
 
 
-@pytest.fixture
-def maxi_html():
-    return """
-    <div class="product-card">
-        <a href="/product/iphone-15" class="product-card__name">iPhone 15 128GB</a>
-        <div class="product-card__price">1 820 ₼</div>
-        <img src="/images/iphone15.jpg" />
-    </div>
-    """
-
-
-@pytest.fixture
-def maxi_maintenance_html():
-    return "<html><body>Proxy Manager</body></html>"

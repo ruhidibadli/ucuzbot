@@ -1,4 +1,4 @@
-# UcuzBot - Azerbaijan Price Tracker
+# UcuzaTap - Azerbaijan Price Tracker
 
 Azərbaycan mağazalarında qiymətləri izləyin və ən ucuz qiyməti tapın.
 
@@ -7,7 +7,7 @@ Track prices across Azerbaijan stores and get notified when prices drop.
 ## Features
 
 - **Price Alerts** — set a target price (e.g. "iPhone 15 under 1500 AZN") and get notified when it drops
-- **6 Store Scrapers** — Kontakt, Baku Electronics, Irshad, Maxi.az, Tap.az, Umico
+- **5 Store Scrapers** — Kontakt, Baku Electronics, Irshad, Tap.az, Birmarket
 - **Web App** — search products, create alerts, and manage them from the browser
 - **Web Authentication** — email/password registration with JWT for cross-device alert sync
 - **Browser Push Notifications** — get notified via Web Push API (VAPID) without an account
@@ -22,9 +22,8 @@ Track prices across Azerbaijan stores and get notified when prices drop.
 | Kontakt Home | kontakt.az |
 | Baku Electronics | bakuelectronics.az |
 | Irshad | irshad.az |
-| Maxi.az | maxi.az |
 | Tap.az | tap.az |
-| Umico | umico.az |
+| Birmarket | birmarket.az |
 
 ## Tech Stack
 

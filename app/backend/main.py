@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.backend.api.routes import alerts, auth, health, products, push, search
+from app.backend.api.routes import admin, alerts, auth, health, products, push, search
 from app.backend.core.config import settings
 from app.backend.core.logging import setup_logging, get_logger
 
@@ -14,7 +14,7 @@ setup_logging()
 logger = get_logger(__name__)
 
 app = FastAPI(
-    title="UcuzBot API",
+    title="UcuzaTap API",
     description="Azerbaijan Price Monitoring System",
     version="1.0.0",
 )
@@ -41,6 +41,7 @@ app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(alerts.router, prefix="/api/v1", tags=["alerts"])
 app.include_router(products.router, prefix="/api/v1", tags=["products"])
 app.include_router(push.router, prefix="/api/v1", tags=["push"])
+app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
 
 
 @app.on_event("startup")

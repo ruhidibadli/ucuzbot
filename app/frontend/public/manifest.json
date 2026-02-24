@@ -1,6 +1,6 @@
 {
-  "name": "UcuzBot - Price Tracker",
-  "short_name": "UcuzBot",
+  "name": "UcuzaTap - Price Tracker",
+  "short_name": "UcuzaTap",
   "description": "Track prices across Azerbaijan stores and get notified on price drops.",
   "start_url": "/",
   "display": "standalone",

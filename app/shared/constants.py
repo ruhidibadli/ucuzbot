@@ -5,7 +5,6 @@ class StoreSlug(StrEnum):
     KONTAKT = "kontakt"
     BAKU_ELECTRONICS = "baku_electronics"
     IRSHAD = "irshad"
-    MAXI = "maxi"
     TAP_AZ = "tap_az"
     UMICO = "umico"
 
@@ -33,12 +32,6 @@ STORE_CONFIGS = {
         "base_url": "https://irshad.az",
         "search_url_template": "https://irshad.az/az/products/list?q={query}",
         "scraper_class": "IrshadScraper",
-    },
-    StoreSlug.MAXI: {
-        "name": "Maxi.az",
-        "base_url": "https://maxi.az",
-        "search_url_template": "https://maxi.az/axtaris?q={query}",
-        "scraper_class": "MaxiScraper",
     },
     StoreSlug.TAP_AZ: {
         "name": "Tap.az",

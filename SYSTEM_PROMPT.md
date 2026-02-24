@@ -31,7 +31,6 @@ All prices are in AZN. All sites are Azerbaijani.
 | Kontakt Home | https://kontakt.az | Retail (Magento 2, React frontend) | Largest electronics retailer. Has search API. May use Cloudflare. |
 | Baku Electronics | https://www.bakuelectronics.az | Retail | Part of Turkish NAB Holding. Standard e-commerce. |
 | Irshad (formerly Irshad Telecom) | https://irshad.az | Retail | 44+ branches. Strong mobile/smartphone catalog. |
-| Maxi.az | https://maxi.az | Retail | Based on former Integral Plus chain. May have intermittent availability. |
 | Tap.az | https://tap.az | Classifieds/Marketplace | Like Craigslist. Mix of private sellers and shops. Uses Cloudflare. Results need filtering (new vs used). |
 | Umico | https://umico.az | Marketplace | Multi-vendor marketplace. Good API/search structure. |
 
@@ -93,7 +92,6 @@ All prices are in AZN. All sites are Azerbaijani.
 │   │   │   ├── kontakt.py
 │   │   │   ├── baku_electronics.py
 │   │   │   ├── irshad.py
-│   │   │   ├── maxi.py
 │   │   │   ├── tap_az.py
 │   │   │   └── umico.py
 │   │   ├── services/
@@ -311,10 +309,6 @@ class BaseScraper(ABC):
 - URL: `tap.az/elanlar?keywords=iphone&category=electronics`
 - **Must filter**: Only include listings from shops/stores, not private sellers if possible.
 - Cloudflare protected — needs proper headers and possibly cookie handling.
-
-**maxi.py:**
-- `maxi.az` — may have intermittent availability (site showed proxy manager page in research).
-- Implement graceful failure — if site is down, skip silently and log.
 
 **umico.py:**
 - Marketplace with multiple vendors.

@@ -244,7 +244,7 @@ Send `/start` to your Telegram bot — it should respond with the welcome messag
 Before deploying, configure your bot via [@BotFather](https://t.me/BotFather):
 
 1. `/newbot` — create bot, get the token
-2. `/setdescription` — set: `UcuzBot - Azərbaycan mağazalarında qiymət izləmə botu`
+2. `/setdescription` — set: `UcuzaTap - Azərbaycan mağazalarında qiymət izləmə botu`
 3. `/setabouttext` — set: `Qiymət düşəndə bildiriş alın! 🔔`
 4. `/setcommands` — set:
    ```

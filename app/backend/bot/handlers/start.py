@@ -20,12 +20,12 @@ router = Router()
 
 WELCOME_MESSAGE = (
     "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-    "\U0001f916  UcuzBot\n"
+    "\U0001f916  UcuzaTap\n"
     "Qiym\u0259t \u0130zl\u0259yici / Price Tracker\n"
     "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n"
     "Xo\u015f g\u0259ldiniz, {first_name}! \U0001f44b\n\n"
     "Az\u0259rbaycan ma\u011fazalar\u0131nda \u0259n ucuz qiym\u0259ti tap\u0131n:\n"
-    "\U0001f3ea Kontakt \u00b7 Baku Electronics \u00b7 Irshad \u00b7 Maxi.az \u00b7 Tap.az \u00b7 Umico\n\n"
+    "\U0001f3ea Kontakt \u00b7 Baku Electronics \u00b7 Irshad \u00b7 Tap.az \u00b7 Birmarket\n\n"
     "\U0001f4cc Nec\u0259 istifad\u0259 etm\u0259li:\n"
     "1\ufe0f\u20e3 M\u0259hsul ad\u0131n\u0131 yaz\u0131n \u2014 avtomatik axtar\u0131\u015f ba\u015flayar\n"
     "2\ufe0f\u20e3 H\u0259d\u0259f qiym\u0259t t\u0259yin edin\n"
@@ -35,7 +35,7 @@ WELCOME_MESSAGE = (
 
 HELP_MESSAGE = (
     "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
-    "\u2139\ufe0f  UcuzBot K\u00f6m\u0259k / Help\n"
+    "\u2139\ufe0f  UcuzaTap K\u00f6m\u0259k / Help\n"
     "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n"
     "\U0001f50d  M\u0259hsul axtarma\n"
     "   Sad\u0259c\u0259 m\u0259hsul ad\u0131n\u0131 yaz\u0131n v\u0259 ya \"\U0001f50d Axtar\" d\u00fcym\u0259sin\u0259 bas\u0131n.\n"
@@ -48,7 +48,7 @@ HELP_MESSAGE = (
     "   \"\U0001f4cb Alertl\u0259rim\" d\u00fcym\u0259si il\u0259 aktiv alertl\u0259rinizi g\u00f6r\u00fcn,\n"
     "   t\u0259f\u0259rr\u00fcat\u0131na bax\u0131n v\u0259 ya silin.\n\n"
     "\U0001f4a1 Pulsuz hesab: 5 alert limiti\n"
-    "\U0001f310 ucuzbot.az"
+    "\U0001f310 ucuzatap.az"
 )
 
 

@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 export const metadata: Metadata = {
-  title: "UcuzBot - Az\u0259rbaycanda Qiym\u0259t \u0130zl\u0259yici",
+  title: "UcuzaTap - Az\u0259rbaycanda Qiym\u0259t \u0130zl\u0259yici",
   description:
     "Az\u0259rbaycan ma\u011Fazalar\u0131nda qiym\u0259tl\u0259ri izl\u0259yin v\u0259 \u0259n ucuz qiym\u0259ti tap\u0131n. Track prices across Azerbaijan stores.",
   manifest: "/manifest.json",

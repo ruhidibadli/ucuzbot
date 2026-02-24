@@ -1,5 +1,12 @@
 import { API_BASE } from "./constants";
-import type { AlertData, AuthUser, SearchResult } from "./types";
+import type {
+  AdminAlertListResponse,
+  AdminStats,
+  AdminUserListResponse,
+  AlertData,
+  AuthUser,
+  SearchResult,
+} from "./types";
 
 export function getAuthHeaders(token: string | null): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -121,6 +128,52 @@ export async function checkAlertNow(token: string | null, alertId: number): Prom
     method: "POST",
     headers: getAuthHeaders(token),
   });
+}
+
+export async function fetchAdminStats(token: string): Promise<AdminStats> {
+  const res = await fetch(`${API_BASE}/admin/stats`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to fetch admin stats");
+  return res.json();
+}
+
+export async function fetchAdminUsers(
+  token: string,
+  page = 1,
+  pageSize = 20,
+  search = ""
+): Promise<AdminUserListResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  if (search.trim()) params.set("search", search.trim());
+  const res = await fetch(`${API_BASE}/admin/users?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to fetch admin users");
+  return res.json();
+}
+
+export async function fetchAdminAlerts(
+  token: string,
+  page = 1,
+  pageSize = 20,
+  statusFilter = "all",
+  storeSlug = ""
+): Promise<AdminAlertListResponse> {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+    status_filter: statusFilter,
+  });
+  if (storeSlug.trim()) params.set("store_slug", storeSlug.trim());
+  const res = await fetch(`${API_BASE}/admin/alerts?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Failed to fetch admin alerts");
+  return res.json();
 }
 
 export async function searchProducts(query: string): Promise<SearchResult[]> {

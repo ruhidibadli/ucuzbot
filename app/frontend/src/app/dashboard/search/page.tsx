@@ -8,7 +8,7 @@ import type { SearchResult } from "@/lib/types";
 function notifySearchResults(query: string, count: number) {
   if (typeof window === "undefined" || count === 0) return;
   if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("UcuzBot — Neticeler tapildi!", {
+    new Notification("UcuzaTap — Neticeler tapildi!", {
       body: `"${query}" ucun ${count} neice / ${count} results for "${query}"`,
       icon: "/icon-192.png",
       tag: "ucuzbot-search",
