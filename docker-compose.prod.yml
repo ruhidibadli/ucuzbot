@@ -1,8 +1,7 @@
 services:
   backend:
     volumes: []
-    ports:
-      - "127.0.0.1:8000:8000"
+    ports: []
 
   bot:
     volumes: []
@@ -15,8 +14,7 @@ services:
   frontend:
     volumes: []
     command: npm start
-    ports:
-      - "127.0.0.1:3000:3000"
+    ports: []
     environment:
       - NODE_ENV=production
 
