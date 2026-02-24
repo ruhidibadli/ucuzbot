@@ -21,12 +21,10 @@ services:
       - NODE_ENV=production
 
   postgres:
-    ports:
-      - "127.0.0.1:5432:5432"
+    ports: []
 
   redis:
-    ports:
-      - "127.0.0.1:6379:6379"
+    ports: []
 
   nginx:
     ports:
