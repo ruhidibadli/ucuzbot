@@ -1,3 +1,4 @@
+import math
 from decimal import Decimal
 
 from aiogram import Router
@@ -5,15 +6,17 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from app.backend.bot.handlers.alerts import AlertCreation
-from app.backend.bot.handlers.search import SearchFlow
+from app.backend.bot.handlers.search import RESULTS_PER_PAGE, SearchFlow, format_search_results
 from app.backend.bot.keyboards import (
     after_alert_created_keyboard,
     after_delete_keyboard,
+    after_search_keyboard,
     alert_detail_keyboard,
     alert_list_keyboard,
     cancel_inline_keyboard,
     main_menu_inline,
     no_alerts_keyboard,
+    pagination_keyboard,
     store_selection_keyboard,
 )
 from app.backend.core.exceptions import AlertLimitReached
@@ -276,6 +279,41 @@ async def handle_alert_actions(callback: CallbackQuery):
                 await callback.answer("\u274c X\u0259ta / Error")
                 return
         await callback.answer()
+
+
+# ── Pagination callbacks ──
+
+@router.callback_query(lambda c: c.data and c.data.startswith("search:") and c.data.split(":")[1].isdigit())
+async def handle_search_pagination(callback: CallbackQuery, state: FSMContext):
+    page = int(callback.data.split(":")[1])
+    data = await state.get_data()
+    results = data.get("search_results")
+    query = data.get("search_query", "")
+
+    if not results:
+        await callback.answer("Nəticələr müddəti bitdi, yenidən axtarın / Results expired, search again")
+        return
+
+    # Reconstruct lightweight product objects for format_search_results
+    from types import SimpleNamespace
+
+    products = [
+        SimpleNamespace(
+            product_name=r["product_name"],
+            price=Decimal(r["price"]),
+            product_url=r["product_url"],
+            store_slug=r["store_slug"],
+            store_name=r["store_name"],
+        )
+        for r in results
+    ]
+
+    total_pages = math.ceil(len(products) / RESULTS_PER_PAGE)
+    page = max(1, min(page, total_pages))
+
+    text = format_search_results(products, query, page)
+    await callback.message.edit_text(text, reply_markup=pagination_keyboard(page, total_pages, "search"))
+    await callback.answer()
 
 
 @router.callback_query(lambda c: c.data == "noop")

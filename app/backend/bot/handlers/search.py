@@ -50,7 +50,7 @@ def format_search_results(products, query: str, page: int = 1) -> str:
     return "\n".join(lines)
 
 
-async def _execute_search(message: Message, query: str):
+async def _execute_search(message: Message, query: str, state: FSMContext | None = None):
     """Reusable search execution — used by cmd_search, SearchFlow, and fallback."""
     if len(query) < 2:
         await message.answer("\u274c \u018fn az\u0131 2 simvol daxil edin / Enter at least 2 characters")
@@ -92,6 +92,20 @@ async def _execute_search(message: Message, query: str):
     text = format_search_results(products, query)
     total_pages = math.ceil(len(products) / RESULTS_PER_PAGE)
 
+    # Store results in FSM state for pagination
+    if state is not None and total_pages > 1:
+        serialized = [
+            {
+                "product_name": p.product_name,
+                "price": str(p.price),
+                "product_url": p.product_url,
+                "store_slug": p.store_slug,
+                "store_name": p.store_name,
+            }
+            for p in products
+        ]
+        await state.update_data(search_results=serialized, search_query=query)
+
     if total_pages > 1:
         await wait_msg.edit_text(text, reply_markup=pagination_keyboard(1, total_pages, "search"))
         await message.answer(
@@ -115,11 +129,11 @@ async def cmd_search(message: Message, state: FSMContext):
         return
 
     query = parts[1].strip()
-    await _execute_search(message, query)
+    await _execute_search(message, query, state)
 
 
 @router.message(SearchFlow.waiting_for_query)
 async def search_receive_query(message: Message, state: FSMContext):
     query = message.text.strip()
     await state.clear()
-    await _execute_search(message, query)
+    await _execute_search(message, query, state)
