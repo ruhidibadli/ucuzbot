@@ -40,7 +40,7 @@ HELP_MESSAGE = (
     "\U0001f50d  M\u0259hsul axtarma\n"
     "   Sad\u0259c\u0259 m\u0259hsul ad\u0131n\u0131 yaz\u0131n v\u0259 ya \"\U0001f50d Axtar\" d\u00fcym\u0259sin\u0259 bas\u0131n.\n"
     "   B\u00fct\u00fcn ma\u011fazalarda eyni anda axtar\u0131\u015f apar\u0131l\u0131r.\n\n"
-    "\U0001f4ca  Qiym\u0259t alert\u0259\n"
+    "\U0001f4ca  Qiym\u0259t alerti\n"
     "   \"\U0001f4ca Yeni Alert\" d\u00fcym\u0259sin\u0259 bas\u0131n.\n"
     "   M\u0259hsul ad\u0131 v\u0259 h\u0259d\u0259f qiym\u0259t daxil edin \u2014 qiym\u0259t d\u00fc\u015f\u0259nd\u0259\n"
     "   avtomatik x\u0259b\u0259rdarl\u0131q alacaqs\u0131n\u0131z.\n\n"

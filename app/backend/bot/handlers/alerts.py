@@ -61,7 +61,7 @@ async def cmd_alert(message: Message, state: FSMContext):
 async def alert_receive_query(message: Message, state: FSMContext):
     query = message.text.strip()
     if len(query) < 2:
-        await message.answer("❌ Ən azı 2 simvol / At least 2 characters")
+        await message.answer("❌ Ən azı 2 simvol daxil edin / Enter at least 2 characters")
         return
 
     wait_msg = await message.answer("⏳ Axtarılır... / Searching...")

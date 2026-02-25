@@ -15,7 +15,7 @@ ACCESSORY_WORDS = frozenset({
     "kılıf", "bumper", "sleeve", "pouch",
     # Screen protectors
     "qoruyucu", "koruyucu", "protector", "tempered",
-    "ekran şüşə",
+    "ekran şüşə", "glass", "film", "plyonka", "plyonka",
     # Cables, chargers, adapters
     "kabel", "cable", "cord", "adapter", "adaptör",
     "şarj", "charger", "naqil", "şnur",
@@ -23,12 +23,16 @@ ACCESSORY_WORDS = frozenset({
     "aksesuar", "aksessuar", "accessory", "accessories",
     # Holders, stands, mounts
     "tutacaq", "holder", "stand", "mount", "tripod",
+    "kronşteyn",
     # Stickers, skins
     "sticker", "yapışqan", "skin", "decal",
     # Straps, bands
     "strap", "qayış", "band",
-    # Bags
-    "çanta",
+    # Bags & carry
+    "çanta", "bag", "sumka",
+    # Other peripherals
+    "stylus", "qələm",
+    "hub", "dock", "dongle",
 })
 
 # Words indicating "this product is FOR something" (not the thing itself).
@@ -41,26 +45,47 @@ def _tokenize(text: str) -> list[str]:
     return [t for t in re.split(r'[\s\-/,.()\[\]]+', text.lower().strip()) if t]
 
 
+def _token_matches(token: str, product_lower: str, product_tokens: set[str]) -> bool:
+    """Check if a query token matches in the product name.
+
+    - Numeric tokens (e.g. "15", "256"): exact token match only.
+      Prevents "15" from matching "150" or "1500".
+    - Short tokens (≤2 chars, e.g. "s", "se"): exact token match only.
+      Prevents false positives on very short substrings.
+    - Longer tokens: substring match to handle morphological suffixes
+      (e.g. "samsung" matches "samsungun").
+    """
+    if token.isdigit() or len(token) <= 2:
+        return token in product_tokens
+    return token in product_lower
+
+
 def score_relevance(query: str, product_name: str) -> float:
     """Score 0.0–1.0 how relevant a product is to the search query.
 
-    Three signals:
+    Four signals:
     1. Query-word match ratio   — what fraction of query words appear
-       in the product name (substring match for morphology).
+       in the product name.
     2. Accessory penalty        — product contains accessory words that
        the query does NOT → score × 0.1.
     3. "For" penalty            — product says "üçün" / "for" but query
        doesn't → score × 0.2.
+    4. Noise penalty            — product name has many extra tokens
+       unrelated to the query → score × 0.6.
     """
     query_tokens = _tokenize(query)
     if not query_tokens:
         return 0.0
 
     product_lower = product_name.lower()
+    product_tokens = set(_tokenize(product_lower))
     query_lower = query.lower()
 
-    # 1. Query-word match ratio
-    matched = sum(1 for t in query_tokens if t in product_lower)
+    # 1. Query-word match ratio (smart matching)
+    matched = sum(
+        1 for t in query_tokens
+        if _token_matches(t, product_lower, product_tokens)
+    )
     score = matched / len(query_tokens)
 
     # 2. Accessory penalty (substring match handles suffixes)
@@ -71,7 +96,6 @@ def score_relevance(query: str, product_name: str) -> float:
         score *= 0.1
 
     # 3. "For" indicator penalty (exact token match)
-    product_tokens = set(_tokenize(product_lower))
     query_tokens_set = set(query_tokens)
 
     product_has_for = bool(product_tokens & FOR_WORDS)
@@ -80,13 +104,24 @@ def score_relevance(query: str, product_name: str) -> float:
     if product_has_for and not query_has_for:
         score *= 0.2
 
+    # 4. Noise penalty — if >70% of product tokens are unrelated to query,
+    #    the product is likely a different item that shares a few keywords.
+    if matched > 0 and len(product_tokens) > 3:
+        related = sum(
+            1 for pt in product_tokens
+            if any(qt in pt or pt in qt for qt in query_tokens)
+        )
+        noise_ratio = 1 - (related / len(product_tokens))
+        if noise_ratio > 0.7:
+            score *= 0.6
+
     return score
 
 
 def filter_relevant(
     products: list,
     query: str,
-    min_score: float = 0.25,
+    min_score: float = 0.4,
 ) -> list:
     """Filter out irrelevant products and keep sorting by price.
 
