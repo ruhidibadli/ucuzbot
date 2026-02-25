@@ -48,14 +48,24 @@ def _tokenize(text: str) -> list[str]:
 def _token_matches(token: str, product_lower: str, product_tokens: set[str]) -> bool:
     """Check if a query token matches in the product name.
 
-    - Numeric tokens (e.g. "15", "256"): exact token match only.
-      Prevents "15" from matching "150" or "1500".
+    - Numeric tokens (e.g. "15", "256"): exact token match, OR prefix
+      match with non-digit suffix (so "512" matches "512gb" but not "5120").
     - Short tokens (≤2 chars, e.g. "s", "se"): exact token match only.
       Prevents false positives on very short substrings.
     - Longer tokens: substring match to handle morphological suffixes
       (e.g. "samsung" matches "samsungun").
     """
-    if token.isdigit() or len(token) <= 2:
+    if token.isdigit():
+        for pt in product_tokens:
+            if pt == token:
+                return True
+            # "512" matches "512gb" but not "5120"
+            if (pt.startswith(token)
+                    and len(pt) > len(token)
+                    and not pt[len(token)].isdigit()):
+                return True
+        return False
+    if len(token) <= 2:
         return token in product_tokens
     return token in product_lower
 
@@ -63,7 +73,7 @@ def _token_matches(token: str, product_lower: str, product_tokens: set[str]) -> 
 def score_relevance(query: str, product_name: str) -> float:
     """Score 0.0–1.0 how relevant a product is to the search query.
 
-    Four signals:
+    Five signals:
     1. Query-word match ratio   — what fraction of query words appear
        in the product name.
     2. Accessory penalty        — product contains accessory words that
@@ -72,6 +82,8 @@ def score_relevance(query: str, product_name: str) -> float:
        doesn't → score × 0.2.
     4. Noise penalty            — product name has many extra tokens
        unrelated to the query → score × 0.6.
+    5. Numeric mismatch penalty — model numbers and specs (e.g. "17",
+       "512") are critical identifiers; missing matches → heavy penalty.
     """
     query_tokens = _tokenize(query)
     if not query_tokens:
@@ -114,6 +126,22 @@ def score_relevance(query: str, product_name: str) -> float:
         noise_ratio = 1 - (related / len(product_tokens))
         if noise_ratio > 0.7:
             score *= 0.6
+
+    # 5. Numeric mismatch penalty — numbers are the strongest identifiers
+    #    (model numbers, storage, RAM). If they don't match, the product
+    #    is almost certainly a different model/spec.
+    numeric_query = [t for t in query_tokens if t.isdigit()]
+    if numeric_query:
+        numeric_matched = sum(
+            1 for t in numeric_query
+            if _token_matches(t, product_lower, product_tokens)
+        )
+        if numeric_matched == 0:
+            # No numbers match at all — wrong model entirely
+            score *= 0.1
+        elif numeric_matched < len(numeric_query):
+            # Some numbers match — partially wrong spec
+            score *= 0.5
 
     return score
 
