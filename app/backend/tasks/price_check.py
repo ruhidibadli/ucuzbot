@@ -40,7 +40,9 @@ async def _check_single_alert(alert_id: int) -> None:
             if not alert or not alert.is_active or alert.is_triggered:
                 return
 
-            products = await search_stores_for_alert(alert.search_query, alert.store_slugs)
+            products = await search_stores_for_alert(
+                alert.search_query, alert.store_slugs, product_category=alert.product_category
+            )
             alert.last_checked_at = datetime.now(timezone.utc)
 
             if not products:

@@ -29,6 +29,7 @@ async def search_all_stores(
     query: str,
     store_slugs: list[str] | None = None,
     max_results_per_store: int = 10,
+    product_category: str | None = None,
 ) -> tuple[list[ScrapedProduct], list[str]]:
     all_scrapers = scraper_registry.get_all()
     if store_slugs:
@@ -59,7 +60,7 @@ async def search_all_stores(
             errors.append(f"{slug}: unexpected result type")
 
     all_products.sort(key=lambda p: p.price)
-    all_products = filter_relevant(all_products, query)
+    all_products = filter_relevant(all_products, query, product_category=product_category)
     return all_products, errors
 
 
@@ -67,6 +68,7 @@ async def search_stores_for_alert(
     query: str,
     store_slugs: list[str],
     max_results_per_store: int = 5,
+    product_category: str | None = None,
 ) -> list[ScrapedProduct]:
-    products, _ = await search_all_stores(query, store_slugs, max_results_per_store)
+    products, _ = await search_all_stores(query, store_slugs, max_results_per_store, product_category=product_category)
     return products

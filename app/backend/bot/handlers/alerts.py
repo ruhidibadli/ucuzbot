@@ -10,6 +10,7 @@ from app.backend.bot.keyboards import (
     after_delete_keyboard,
     alert_list_keyboard,
     cancel_inline_keyboard,
+    category_selection_keyboard,
     main_menu_inline,
     no_alerts_keyboard,
     store_selection_keyboard,
@@ -22,6 +23,7 @@ from app.backend.services.alert_service import (
     get_or_create_user,
     get_user_alerts,
 )
+from app.backend.services.category_detector import detect_categories
 from app.backend.services.search_service import search_all_stores
 
 router = Router()
@@ -29,6 +31,7 @@ router = Router()
 
 class AlertCreation(StatesGroup):
     waiting_for_query = State()
+    waiting_for_category = State()
     waiting_for_price = State()
     waiting_for_stores = State()
 
@@ -73,11 +76,13 @@ async def alert_receive_query(message: Message, state: FSMContext):
         await wait_msg.edit_text("\n".join(lines))
 
     await state.update_data(search_query=query, products=len(products))
-    await state.set_state(AlertCreation.waiting_for_price)
+
+    categories = detect_categories(query)
+    await state.set_state(AlertCreation.waiting_for_category)
     await message.answer(
-        "\U0001f4b0 H\u0259d\u0259f qiym\u0259t daxil edin (AZN):\n"
-        "Enter target price (AZN):",
-        reply_markup=cancel_inline_keyboard(),
+        "📂 Məhsul kateqoriyasını seçin:\n"
+        "Select product category:",
+        reply_markup=category_selection_keyboard(categories),
     )
 
 

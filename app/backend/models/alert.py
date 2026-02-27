@@ -31,6 +31,7 @@ class Alert(Base):
     search_query: Mapped[str] = mapped_column(String(500), nullable=False)
     target_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     store_slugs: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False)
+    product_category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_triggered: Mapped[bool] = mapped_column(Boolean, default=False)
     triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

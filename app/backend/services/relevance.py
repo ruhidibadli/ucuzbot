@@ -70,7 +70,7 @@ def _token_matches(token: str, product_lower: str, product_tokens: set[str]) -> 
     return token in product_lower
 
 
-def score_relevance(query: str, product_name: str) -> float:
+def score_relevance(query: str, product_name: str, product_category: str | None = None) -> float:
     """Score 0.0–1.0 how relevant a product is to the search query.
 
     Five signals:
@@ -90,6 +90,16 @@ def score_relevance(query: str, product_name: str) -> float:
         return 0.0
 
     product_lower = product_name.lower()
+
+    # Hard category filter: if a category is set and has exclude_words,
+    # any match means this product is completely irrelevant.
+    if product_category and product_category not in ("all", "accessory"):
+        from app.backend.services.category_detector import CATEGORIES
+
+        cat = CATEGORIES.get(product_category)
+        if cat and cat.exclude_words:
+            if any(w in product_lower for w in cat.exclude_words):
+                return 0.0
     product_tokens = set(_tokenize(product_lower))
     query_lower = query.lower()
 
@@ -150,6 +160,7 @@ def filter_relevant(
     products: list,
     query: str,
     min_score: float = 0.4,
+    product_category: str | None = None,
 ) -> list:
     """Filter out irrelevant products and keep sorting by price.
 
@@ -164,5 +175,5 @@ def filter_relevant(
 
     return [
         p for p in products
-        if score_relevance(query, p.product_name) >= min_score
+        if score_relevance(query, p.product_name, product_category) >= min_score
     ]

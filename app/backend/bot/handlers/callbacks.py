@@ -14,14 +14,20 @@ from app.backend.bot.keyboards import (
     alert_detail_keyboard,
     alert_list_keyboard,
     cancel_inline_keyboard,
+    category_selection_keyboard,
     main_menu_inline,
     no_alerts_keyboard,
     pagination_keyboard,
     store_selection_keyboard,
 )
 from app.backend.core.exceptions import DuplicateAlert
+from sqlalchemy import select
+
 from app.backend.db.base import async_session_factory
+from app.backend.models.alert import Alert
 from app.backend.models.bot_activity import log_bot_activity
+from app.backend.models.user import User
+from app.backend.services.category_detector import CATEGORIES, detect_categories
 from app.backend.services.alert_service import (
     create_alert,
     delete_alert,
@@ -111,14 +117,34 @@ async def handle_menu(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(lambda c: c.data and c.data.startswith("search:alert:"))
 async def handle_search_alert(callback: CallbackQuery, state: FSMContext):
     query = callback.data.split(":", 2)[2]
-    await state.set_state(AlertCreation.waiting_for_query)
     await state.update_data(search_query=query, products=0)
-    await state.set_state(AlertCreation.waiting_for_price)
+
+    categories = detect_categories(query)
+    await state.set_state(AlertCreation.waiting_for_category)
     await callback.message.answer(
         f"\U0001f4ca Alert: \"{query}\"\n\n"
+        f"\U0001f4c2 M\u0259hsul kateqoriyas\u0131n\u0131 se\u00e7in:\n"
+        f"Select product category:",
+        reply_markup=category_selection_keyboard(categories),
+    )
+    await callback.answer()
+
+
+# ── Category selection callback ──
+
+@router.callback_query(lambda c: c.data and c.data.startswith("cat:"))
+async def handle_category_selection(callback: CallbackQuery, state: FSMContext):
+    slug = callback.data.split(":", 1)[1]
+    await state.update_data(product_category=slug)
+    await state.set_state(AlertCreation.waiting_for_price)
+
+    cat = CATEGORIES.get(slug)
+    cat_label = f"{cat.emoji} {cat.name_az}" if cat else slug
+
+    await callback.message.edit_text(
+        f"\u2705 Kateqoriya: {cat_label}\n\n"
         f"\U0001f4b0 H\u0259d\u0259f qiym\u0259t daxil edin (AZN):\n"
         f"Enter target price (AZN):",
-        reply_markup=cancel_inline_keyboard(),
     )
     await callback.answer()
 
@@ -160,6 +186,7 @@ async def _finalize_alert(callback: CallbackQuery, state: FSMContext, selected_s
     search_query = data["search_query"]
     target_price = Decimal(data["target_price"])
     store_slugs = list(selected_stores)
+    product_category = data.get("product_category")
 
     async with async_session_factory() as session:
         user = await get_or_create_user(
@@ -169,7 +196,10 @@ async def _finalize_alert(callback: CallbackQuery, state: FSMContext, selected_s
             first_name=callback.from_user.first_name,
         )
         try:
-            alert = await create_alert(session, user, search_query, target_price, store_slugs)
+            alert = await create_alert(
+                session, user, search_query, target_price, store_slugs,
+                product_category=product_category,
+            )
             await log_bot_activity(
                 session,
                 user_id=user.id,
@@ -180,7 +210,7 @@ async def _finalize_alert(callback: CallbackQuery, state: FSMContext, selected_s
             await session.commit()
         except DuplicateAlert:
             await callback.message.edit_text(
-                f"❌ \"{search_query}\" üçün artıq aktiv alert var / Alert already exists for this query",
+                f"\u274c \"{search_query}\" \u00fc\u00e7\u00fcn art\u0131q aktiv alert var / Alert already exists for this query",
                 reply_markup=main_menu_inline(),
             )
             await state.clear()
@@ -193,9 +223,13 @@ async def _finalize_alert(callback: CallbackQuery, state: FSMContext, selected_s
         pass  # Non-critical: alert is saved, price check will run on next schedule
 
     store_names = [STORE_CONFIGS[s]["name"] for s in store_slugs if s in STORE_CONFIGS]
+    cat = CATEGORIES.get(product_category) if product_category else None
+    cat_line = f"\U0001f4c2 {cat.emoji} {cat.name_az}\n" if cat else ""
+
     await callback.message.edit_text(
         f"\u2705 Alert yarad\u0131ld\u0131! / Alert created!\n\n"
         f"\U0001f4f1 {search_query}\n"
+        f"{cat_line}"
         f"\U0001f3af H\u0259d\u0259f: {target_price:,.2f} \u20bc\n"
         f"\U0001f3ea {', '.join(store_names)}\n\n"
         f"Qiym\u0259t d\u00fc\u015fd\u00fckd\u0259 siz\u0259 x\u0259b\u0259r ver\u0259c\u0259yik!\n"
@@ -243,9 +277,12 @@ async def handle_alert_actions(callback: CallbackQuery):
             return
 
         store_names = [STORE_CONFIGS.get(s, {}).get("name", s) for s in alert.store_slugs]
+        cat = CATEGORIES.get(alert.product_category) if alert.product_category else None
+        cat_line = f"\U0001f4c2 {cat.emoji} {cat.name_az}\n" if cat else ""
         text = (
             f"\U0001f4ca Alert #{alert.id}\n\n"
             f"\U0001f4f1 {alert.search_query}\n"
+            f"{cat_line}"
             f"\U0001f3af H\u0259d\u0259f: {alert.target_price:,.2f} \u20bc\n"
             f"\U0001f3ea {', '.join(store_names)}\n"
         )
@@ -254,7 +291,35 @@ async def handle_alert_actions(callback: CallbackQuery):
         if alert.last_checked_at:
             text += f"\U0001f550 Son yoxlama: {alert.last_checked_at.strftime('%d.%m.%Y %H:%M')}\n"
 
-        await callback.message.edit_text(text, reply_markup=alert_detail_keyboard(alert_id))
+        await callback.message.edit_text(text, reply_markup=alert_detail_keyboard(alert_id, is_triggered=alert.is_triggered))
+        await callback.answer()
+
+    elif action == "reactivate":
+        alert_id = int(parts[2])
+        async with async_session_factory() as session:
+            result = await session.execute(
+                select(Alert)
+                .join(User)
+                .where(Alert.id == alert_id, User.telegram_id == callback.from_user.id)
+            )
+            alert = result.scalar_one_or_none()
+            if not alert:
+                await callback.answer("Alert tap\u0131lmad\u0131 / Not found")
+                return
+            alert.is_triggered = False
+            alert.triggered_at = None
+            await log_bot_activity(
+                session,
+                user_id=None,
+                telegram_id=callback.from_user.id,
+                action="alert_reactivate",
+                detail=f"Alert #{alert_id}",
+            )
+            await session.commit()
+        await callback.message.edit_text(
+            f"\u2705 Alert #{alert_id} yenid\u0259n aktivl\u0259\u015fdirildi / reactivated",
+            reply_markup=alert_detail_keyboard(alert_id, is_triggered=False),
+        )
         await callback.answer()
 
     elif action == "check":
