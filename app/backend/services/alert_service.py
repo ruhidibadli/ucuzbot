@@ -3,7 +3,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.backend.core.exceptions import AlertLimitReached, AlertNotFound
+from app.backend.core.exceptions import AlertNotFound, DuplicateAlert
 from app.backend.core.logging import get_logger
 from app.backend.models.alert import Alert
 from app.backend.models.push_subscription import PushSubscription
@@ -46,9 +46,9 @@ async def create_alert(
     target_price: Decimal,
     store_slugs: list[str],
 ) -> Alert:
-    active_count = await _count_active_alerts(session, user.id)
-    if active_count >= user.max_alerts:
-        raise AlertLimitReached(user.max_alerts)
+    existing = await _find_duplicate_alert(session, user_id=user.id, search_query=search_query)
+    if existing:
+        raise DuplicateAlert(search_query)
 
     alert = Alert(
         user_id=user.id,
@@ -70,9 +70,13 @@ async def create_alert_for_push(
     store_slugs: list[str],
 ) -> Alert:
     if push_sub.user_id:
-        active_count = await _count_active_alerts(session, push_sub.user_id)
-        if active_count >= 5:  # default limit for push-only users
-            raise AlertLimitReached(5)
+        existing = await _find_duplicate_alert(session, user_id=push_sub.user_id, search_query=search_query)
+        if existing:
+            raise DuplicateAlert(search_query)
+    else:
+        existing = await _find_duplicate_alert_by_push(session, push_subscription_id=push_sub.id, search_query=search_query)
+        if existing:
+            raise DuplicateAlert(search_query)
 
     alert = Alert(
         user_id=push_sub.user_id,
@@ -132,8 +136,31 @@ async def delete_alert(session: AsyncSession, alert_id: int, telegram_id: int) -
     logger.info("alert_deleted", alert_id=alert_id)
 
 
-async def _count_active_alerts(session: AsyncSession, user_id: int) -> int:
+async def _find_duplicate_alert(
+    session: AsyncSession, user_id: int, search_query: str
+) -> Alert | None:
+    from sqlalchemy import func
+
     result = await session.execute(
-        select(Alert).where(Alert.user_id == user_id, Alert.is_active == True)  # noqa: E712
+        select(Alert).where(
+            Alert.user_id == user_id,
+            Alert.is_active == True,  # noqa: E712
+            func.lower(Alert.search_query) == search_query.lower(),
+        )
     )
-    return len(result.scalars().all())
+    return result.scalar_one_or_none()
+
+
+async def _find_duplicate_alert_by_push(
+    session: AsyncSession, push_subscription_id: int, search_query: str
+) -> Alert | None:
+    from sqlalchemy import func
+
+    result = await session.execute(
+        select(Alert).where(
+            Alert.push_subscription_id == push_subscription_id,
+            Alert.is_active == True,  # noqa: E712
+            func.lower(Alert.search_query) == search_query.lower(),
+        )
+    )
+    return result.scalar_one_or_none()

@@ -19,7 +19,7 @@ from app.backend.bot.keyboards import (
     pagination_keyboard,
     store_selection_keyboard,
 )
-from app.backend.core.exceptions import AlertLimitReached
+from app.backend.core.exceptions import DuplicateAlert
 from app.backend.db.base import async_session_factory
 from app.backend.models.bot_activity import log_bot_activity
 from app.backend.services.alert_service import (
@@ -178,15 +178,19 @@ async def _finalize_alert(callback: CallbackQuery, state: FSMContext, selected_s
                 detail=f"{search_query} \u2264 {target_price} AZN [{', '.join(store_slugs)}]",
             )
             await session.commit()
-            check_single_alert.delay(alert.id)
-        except AlertLimitReached as e:
+        except DuplicateAlert:
             await callback.message.edit_text(
-                f"\u274c Alert limiti dolub / Alert limit reached ({e.max_alerts})",
-                reply_markup=alert_list_keyboard([]),
+                f"❌ \"{search_query}\" üçün artıq aktiv alert var / Alert already exists for this query",
+                reply_markup=main_menu_inline(),
             )
             await state.clear()
             await callback.answer()
             return
+
+    try:
+        check_single_alert.delay(alert.id)
+    except Exception:
+        pass  # Non-critical: alert is saved, price check will run on next schedule
 
     store_names = [STORE_CONFIGS[s]["name"] for s in store_slugs if s in STORE_CONFIGS]
     await callback.message.edit_text(

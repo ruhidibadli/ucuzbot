@@ -20,3 +20,9 @@ class StoreNotFound(UcuzBotError):
 
 class AlertNotFound(UcuzBotError):
     pass
+
+
+class DuplicateAlert(UcuzBotError):
+    def __init__(self, search_query: str):
+        self.search_query = search_query
+        super().__init__(f"Active alert already exists for: {search_query}")

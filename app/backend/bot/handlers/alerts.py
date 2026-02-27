@@ -14,7 +14,6 @@ from app.backend.bot.keyboards import (
     no_alerts_keyboard,
     store_selection_keyboard,
 )
-from app.backend.core.exceptions import AlertLimitReached
 from app.backend.db.base import async_session_factory
 from app.backend.models.bot_activity import log_bot_activity
 from app.backend.services.alert_service import (

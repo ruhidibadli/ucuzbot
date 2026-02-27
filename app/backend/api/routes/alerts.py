@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backend.api.dependencies import get_current_user, get_db, get_optional_user
-from app.backend.core.exceptions import AlertLimitReached, AlertNotFound
+from app.backend.core.exceptions import AlertNotFound, DuplicateAlert
 from app.backend.models.alert import Alert
 from app.backend.models.push_subscription import PushSubscription
 from app.backend.models.user import User
@@ -54,10 +54,13 @@ async def create_new_alert(
                 db, current_user, data.search_query, data.target_price, data.store_slugs
             )
             await db.commit()
+        except DuplicateAlert as e:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        try:
             check_single_alert.delay(alert.id)
-            return alert
-        except AlertLimitReached as e:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        except Exception:
+            pass
+        return alert
 
     if data.telegram_id is None and data.push_endpoint is None:
         raise HTTPException(
@@ -72,10 +75,13 @@ async def create_new_alert(
                 db, user, data.search_query, data.target_price, data.store_slugs
             )
             await db.commit()
+        except DuplicateAlert as e:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        try:
             check_single_alert.delay(alert.id)
-            return alert
-        except AlertLimitReached as e:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        except Exception:
+            pass
+        return alert
 
     # Browser push-based alert (no Telegram)
     result = await db.execute(
@@ -95,10 +101,13 @@ async def create_new_alert(
             db, push_sub, data.search_query, data.target_price, data.store_slugs
         )
         await db.commit()
+    except DuplicateAlert as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    try:
         check_single_alert.delay(alert.id)
-        return alert
-    except AlertLimitReached as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception:
+        pass
+    return alert
 
 
 @router.post("/alerts/by-push", response_model=list[AlertResponse])
