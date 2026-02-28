@@ -73,7 +73,7 @@ async def create_new_alert(
         )
 
     if data.telegram_id is not None:
-        user = await get_or_create_user(db, data.telegram_id)
+        user, _ = await get_or_create_user(db, data.telegram_id)
         try:
             alert = await create_alert(
                 db, user, data.search_query, data.target_price, data.store_slugs,

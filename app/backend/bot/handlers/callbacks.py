@@ -2,12 +2,14 @@ import math
 from decimal import Decimal
 
 from aiogram import Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.backend.bot.handlers.alerts import AlertCreation, AlertEditing, UserSettings
 from app.backend.bot.handlers.search import RESULTS_PER_PAGE, SearchFlow, format_search_results
 from app.backend.bot.keyboards import (
+    ONBOARDING_STEPS,
     _category_emoji,
     after_alert_created_keyboard,
     after_delete_keyboard,
@@ -17,8 +19,11 @@ from app.backend.bot.keyboards import (
     alert_list_keyboard,
     cancel_inline_keyboard,
     category_selection_keyboard,
+    delete_confirmation_keyboard,
     main_menu_inline,
+    maybe_tip,
     no_alerts_keyboard,
+    onboarding_keyboard,
     pagination_keyboard,
     quiet_hours_keyboard,
     settings_keyboard,
@@ -67,30 +72,40 @@ async def handle_menu(callback: CallbackQuery, state: FSMContext):
     if action == "search":
         await state.clear()
         await state.set_state(SearchFlow.waiting_for_query)
-        await callback.message.answer(
-            "\U0001f50d M\u0259hsul ad\u0131n\u0131 yaz\u0131n:\n"
-            "Type the product name:",
-            reply_markup=cancel_inline_keyboard(),
-        )
+        try:
+            await callback.message.edit_text(
+                "\U0001f50d M\u0259hsul ad\u0131n\u0131 yaz\u0131n:\n"
+                "Type the product name:",
+                reply_markup=cancel_inline_keyboard(),
+            )
+        except TelegramBadRequest:
+            pass
         await callback.answer()
 
     elif action == "alert":
         await state.set_state(AlertCreation.waiting_for_query)
-        await callback.message.answer(
-            "\U0001f50d Hans\u0131 m\u0259hsulu izl\u0259m\u0259k ist\u0259yirsiniz?\n"
-            "What product do you want to track?",
-            reply_markup=cancel_inline_keyboard(),
-        )
+        try:
+            await callback.message.edit_text(
+                "\U0001f50d Hans\u0131 m\u0259hsulu izl\u0259m\u0259k ist\u0259yirsiniz?\n"
+                "What product do you want to track?",
+                reply_markup=cancel_inline_keyboard(),
+            )
+        except TelegramBadRequest:
+            pass
         await callback.answer()
 
     elif action == "myalerts":
+        await callback.message.answer_chat_action("typing")
         async with async_session_factory() as session:
             alerts = await get_user_alerts(session, callback.from_user.id)
         if not alerts:
-            await callback.message.answer(
-                "\U0001f4ed Aktiv alertiniz yoxdur / No active alerts",
-                reply_markup=no_alerts_keyboard(),
-            )
+            try:
+                await callback.message.edit_text(
+                    "\U0001f4ed Aktiv alertiniz yoxdur / No active alerts",
+                    reply_markup=no_alerts_keyboard(),
+                )
+            except TelegramBadRequest:
+                pass
         else:
             lines = ["\U0001f4cb Alert\u0259l\u0259riniz / Your alerts:\n"]
             for a in alerts:
@@ -98,28 +113,40 @@ async def handle_menu(callback: CallbackQuery, state: FSMContext):
                 cat_emoji = _category_emoji(getattr(a, "product_category", None))
                 price_info = f" (\u0259n a\u015fa\u011f\u0131: {a.lowest_price_found} \u20bc)" if a.lowest_price_found else ""
                 lines.append(f"{status} {cat_emoji}#{a.id} {a.search_query}\n   H\u0259d\u0259f: {a.target_price} \u20bc{price_info}")
-            await callback.message.answer(
-                "\n".join(lines), reply_markup=alert_list_keyboard(alerts)
-            )
+            try:
+                await callback.message.edit_text(
+                    "\n".join(lines), reply_markup=alert_list_keyboard(alerts)
+                )
+            except TelegramBadRequest:
+                pass
         await callback.answer()
 
     elif action == "help":
         from app.backend.bot.handlers.start import HELP_MESSAGE
 
-        await callback.message.answer(HELP_MESSAGE, reply_markup=main_menu_inline())
+        try:
+            await callback.message.edit_text(HELP_MESSAGE, reply_markup=main_menu_inline())
+        except TelegramBadRequest:
+            pass
         await callback.answer()
 
     elif action == "settings":
-        await callback.message.answer(
-            "\u2699\ufe0f T\u0259nziml\u0259m\u0259l\u0259r / Settings",
-            reply_markup=settings_keyboard(),
-        )
+        try:
+            await callback.message.edit_text(
+                "\u2699\ufe0f T\u0259nziml\u0259m\u0259l\u0259r / Settings",
+                reply_markup=settings_keyboard(),
+            )
+        except TelegramBadRequest:
+            pass
         await callback.answer()
 
     elif action == "main":
-        await callback.message.answer(
-            "N\u0259 etm\u0259k ist\u0259yirsiniz?", reply_markup=main_menu_inline()
-        )
+        try:
+            await callback.message.edit_text(
+                "N\u0259 etm\u0259k ist\u0259yirsiniz?", reply_markup=main_menu_inline()
+            )
+        except TelegramBadRequest:
+            pass
         await callback.answer()
 
     else:
@@ -281,7 +308,7 @@ async def _finalize_alert(callback: CallbackQuery, state: FSMContext, selected_s
     product_category = data.get("product_category")
 
     async with async_session_factory() as session:
-        user = await get_or_create_user(
+        user, _ = await get_or_create_user(
             session,
             telegram_id=callback.from_user.id,
             username=callback.from_user.username,
@@ -328,6 +355,7 @@ async def _finalize_alert(callback: CallbackQuery, state: FSMContext, selected_s
     cat = CATEGORIES.get(product_category) if product_category else None
     cat_line = f"\U0001f4c2 {cat.emoji} {cat.name_az}\n" if cat else ""
 
+    tip = maybe_tip("after_alert_created")
     await callback.message.edit_text(
         f"\u2705 Alert yarad\u0131ld\u0131! / Alert created!\n\n"
         f"\U0001f4f1 {search_query}\n"
@@ -335,7 +363,7 @@ async def _finalize_alert(callback: CallbackQuery, state: FSMContext, selected_s
         f"\U0001f3af H\u0259d\u0259f: {target_price:,.2f} \u20bc\n"
         f"\U0001f3ea {', '.join(store_names)}\n\n"
         f"Qiym\u0259t d\u00fc\u015fd\u00fckd\u0259 siz\u0259 x\u0259b\u0259r ver\u0259c\u0259yik!\n"
-        f"We'll notify you when the price drops!",
+        f"We'll notify you when the price drops!{tip}",
         reply_markup=after_alert_created_keyboard(),
     )
     await state.clear()
@@ -376,6 +404,7 @@ async def handle_alert_actions(callback: CallbackQuery, state: FSMContext):
     action = parts[1]
 
     if action == "list":
+        await callback.message.answer_chat_action("typing")
         async with async_session_factory() as session:
             alerts = await get_user_alerts(session, callback.from_user.id)
         if not alerts:
@@ -436,6 +465,7 @@ async def handle_alert_actions(callback: CallbackQuery, state: FSMContext):
                     store_name = STORE_CONFIGS.get(r.store_slug, {}).get("name", r.store_slug)
                     text += f"  {date_str}: {r.price:,.2f} \u20bc ({store_name})\n"
 
+        text += maybe_tip("alert_detail")
         await callback.message.edit_text(text, reply_markup=alert_detail_keyboard(alert_id, is_triggered=alert.is_triggered))
         await callback.answer()
 
@@ -533,6 +563,17 @@ async def handle_alert_actions(callback: CallbackQuery, state: FSMContext):
 
     elif action == "delete":
         alert_id = int(parts[2])
+        await callback.message.edit_text(
+            f"\u26a0\ufe0f Alert #{alert_id} silinsin?\n"
+            f"Bu \u0259m\u0259liyyat geri qaytarıla bilm\u0259z.\n\n"
+            f"Delete alert #{alert_id}?\n"
+            f"This action cannot be undone.",
+            reply_markup=delete_confirmation_keyboard(alert_id),
+        )
+        await callback.answer()
+
+    elif action == "confirmdelete":
+        alert_id = int(parts[2])
         async with async_session_factory() as session:
             try:
                 await delete_alert(session, alert_id, callback.from_user.id)
@@ -591,4 +632,39 @@ async def handle_search_pagination(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(lambda c: c.data == "noop")
 async def handle_noop(callback: CallbackQuery):
+    await callback.answer()
+
+
+# ── Onboarding callbacks ──
+
+@router.callback_query(lambda c: c.data and c.data.startswith("onboarding:"))
+async def handle_onboarding(callback: CallbackQuery):
+    value = callback.data.split(":", 1)[1]
+
+    if value == "done":
+        async with async_session_factory() as session:
+            await session.execute(
+                update(User)
+                .where(User.telegram_id == callback.from_user.id)
+                .values(has_completed_onboarding=True)
+            )
+            await session.commit()
+        await callback.message.edit_text(
+            "\U0001f389 Haz\u0131rs\u0131n\u0131z! / You're all set!\n\n"
+            "A\u015fa\u011f\u0131dak\u0131 menyudan ba\u015flay\u0131n:",
+            reply_markup=main_menu_inline(),
+        )
+        await callback.answer()
+        return
+
+    step = int(value)
+    step_data = ONBOARDING_STEPS.get(step)
+    if not step_data:
+        await callback.answer()
+        return
+
+    await callback.message.edit_text(
+        f"({step}/3) {step_data['title']}\n\n{step_data['text']}",
+        reply_markup=onboarding_keyboard(step),
+    )
     await callback.answer()

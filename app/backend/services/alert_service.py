@@ -18,7 +18,7 @@ async def get_or_create_user(
     username: str | None = None,
     first_name: str | None = None,
     language_code: str = "az",
-) -> User:
+) -> tuple[User, bool]:
     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
     if user:
@@ -26,7 +26,7 @@ async def get_or_create_user(
             user.username = username
         if first_name:
             user.first_name = first_name
-        return user
+        return user, False
 
     user = User(
         telegram_id=telegram_id,
@@ -36,7 +36,7 @@ async def get_or_create_user(
     )
     session.add(user)
     await session.flush()
-    return user
+    return user, True
 
 
 async def _check_alert_limit(session: AsyncSession, user: User) -> None:

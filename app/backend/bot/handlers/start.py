@@ -8,9 +8,11 @@ from app.backend.bot.keyboards import (
     BTN_MY_ALERTS,
     BTN_NEW_ALERT,
     BTN_SEARCH,
+    ONBOARDING_STEPS,
     cancel_inline_keyboard,
     main_menu_inline,
     main_menu_keyboard,
+    onboarding_keyboard,
     start_actions_inline,
 )
 from app.backend.db.base import async_session_factory
@@ -68,7 +70,7 @@ HELP_MESSAGE = (
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     async with async_session_factory() as session:
-        await get_or_create_user(
+        user, is_new = await get_or_create_user(
             session,
             telegram_id=message.from_user.id,
             username=message.from_user.username,
@@ -76,12 +78,23 @@ async def cmd_start(message: Message, state: FSMContext):
             language_code=message.from_user.language_code or "az",
         )
         await session.commit()
+
     first_name = message.from_user.first_name or "dostum"
+    should_onboard = is_new or not user.has_completed_onboarding
+
     await message.answer(
         WELCOME_MESSAGE.format(first_name=first_name),
         reply_markup=main_menu_keyboard(),
     )
-    await message.answer("N\u0259 etm\u0259k ist\u0259yirsiniz?", reply_markup=start_actions_inline())
+
+    if should_onboard:
+        step_data = ONBOARDING_STEPS[1]
+        await message.answer(
+            f"(1/3) {step_data['title']}\n\n{step_data['text']}",
+            reply_markup=onboarding_keyboard(1),
+        )
+    else:
+        await message.answer("N\u0259 etm\u0259k ist\u0259yirsiniz?", reply_markup=start_actions_inline())
 
 
 @router.message(Command("help"))

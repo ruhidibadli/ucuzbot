@@ -1,3 +1,5 @@
+import random
+
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -260,3 +262,84 @@ def price_drop_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="\U0001f4cb Alertl\u0259rim\u0259 bax", callback_data="menu:myalerts")],
     ])
+
+
+# ── Delete confirmation ──
+
+def delete_confirmation_keyboard(alert_id: int) -> InlineKeyboardMarkup:
+    """Confirmation screen before deleting an alert."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="\u2705 B\u0259li, sil / Yes, delete",
+            callback_data=f"alert:confirmdelete:{alert_id}",
+        )],
+        [InlineKeyboardButton(
+            text="\u274c Xeyr, geri / No, go back",
+            callback_data=f"alert:view:{alert_id}",
+        )],
+    ])
+
+
+# ── Onboarding ──
+
+ONBOARDING_STEPS = {
+    1: {
+        "title": "\U0001f50d Axtar\u0131\u015f / Search",
+        "text": (
+            "M\u0259hsul ad\u0131n\u0131 yaz\u0131n \u2014 b\u00fct\u00fcn ma\u011fazalarda eyni anda axtar\u0131l\u0131r.\n\n"
+            "Type a product name \u2014 all stores are searched at once.\n\n"
+            "M\u0259s\u0259l\u0259n: \"iPhone 15\", \"Samsung TV\", \"Nike Air Max\""
+        ),
+    },
+    2: {
+        "title": "\U0001f4ca Alert / Price Alert",
+        "text": (
+            "H\u0259d\u0259f qiym\u0259t t\u0259yin edin \u2014 qiym\u0259t d\u00fc\u015f\u0259nd\u0259 sizə x\u0259b\u0259r ver\u0259c\u0259yik.\n\n"
+            "Set a target price \u2014 we'll notify you when it drops.\n\n"
+            "Maksimum 5 alert yarada bil\u0259rsiniz."
+        ),
+    },
+    3: {
+        "title": "\u2699\ufe0f T\u0259nziml\u0259m\u0259l\u0259r / Settings",
+        "text": (
+            "Sakit saatlar t\u0259yin edin \u2014 gec\u0259 vaxt\u0131 bildiri\u015f g\u00f6nd\u0259rilm\u0259sin.\n\n"
+            "Set quiet hours \u2014 no notifications during the night.\n\n"
+            "/settings komutu il\u0259 ist\u0259nil\u0259n vaxt d\u0259yi\u015f\u0259 bil\u0259rsiniz."
+        ),
+    },
+}
+
+
+def onboarding_keyboard(step: int) -> InlineKeyboardMarkup:
+    """Navigation keyboard for onboarding steps."""
+    if step < 3:
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="N\u00f6vb\u0259ti \u27a1\ufe0f",
+                callback_data=f"onboarding:{step + 1}",
+            )],
+        ])
+    else:
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Ba\u015fla! \U0001f680",
+                callback_data="onboarding:done",
+            )],
+        ])
+
+
+# ── Contextual tips ──
+
+CONTEXTUAL_TIPS = {
+    "after_alert_created": "\U0001f4a1 /settings il\u0259 sakit saatlar t\u0259yin ed\u0259 bil\u0259rsiniz",
+    "search_no_results": "\U0001f4a1 Daha q\u0131sa a\u00e7ar s\u00f6zl\u0259r s\u0131nay\u0131n. M\u0259s: 'iphone 15 pro' \u0259v\u0259zin\u0259 'iphone 15'",
+    "alert_detail": "\U0001f4a1 \u270f\ufe0f Redakt\u0259 il\u0259 h\u0259d\u0259f qiym\u0259ti d\u0259yi\u015f\u0259 bil\u0259rsiniz",
+}
+
+
+def maybe_tip(tip_key: str, chance: float = 0.3) -> str:
+    """Return a contextual tip with given probability, else empty string."""
+    if random.random() < chance:
+        tip = CONTEXTUAL_TIPS.get(tip_key, "")
+        return f"\n\n{tip}" if tip else ""
+    return ""
