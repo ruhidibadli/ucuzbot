@@ -5,6 +5,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 
+from app.backend.services.category_detector import CATEGORIES
 from app.shared.constants import STORE_CONFIGS
 
 # ── Reply keyboard button labels (used for matching in handlers) ──
@@ -36,6 +37,9 @@ def main_menu_inline() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(text="\U0001f4cb Alert\u0259l\u0259rim", callback_data="menu:myalerts"),
             InlineKeyboardButton(text="\u2139\ufe0f K\u00f6m\u0259k", callback_data="menu:help"),
+        ],
+        [
+            InlineKeyboardButton(text="\u2699\ufe0f T\u0259nziml\u0259m\u0259l\u0259r", callback_data="menu:settings"),
         ],
     ])
 
@@ -93,14 +97,22 @@ def store_selection_keyboard(selected: set[str] | None = None) -> InlineKeyboard
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+def _category_emoji(product_category: str | None) -> str:
+    if not product_category:
+        return ""
+    cat = CATEGORIES.get(product_category)
+    return f"{cat.emoji} " if cat else ""
+
+
 def alert_list_keyboard(alerts: list) -> InlineKeyboardMarkup:
     buttons = []
     for alert in alerts:
         status = "\U0001f7e2" if alert.is_active and not alert.is_triggered else "\U0001f534"
+        cat_emoji = _category_emoji(getattr(alert, "product_category", None))
         price_info = f" ({alert.lowest_price_found} \u20bc)" if alert.lowest_price_found else ""
         buttons.append([
             InlineKeyboardButton(
-                text=f"{status} {alert.search_query}{price_info}",
+                text=f"{status} {cat_emoji}{alert.search_query}{price_info}",
                 callback_data=f"alert:view:{alert.id}",
             )
         ])
@@ -122,12 +134,37 @@ def alert_detail_keyboard(alert_id: int, is_triggered: bool = False) -> InlineKe
             text="\U0001f504 \u0130ndi yoxla / Check Now",
             callback_data=f"alert:check:{alert_id}",
         )])
+    buttons.append([InlineKeyboardButton(
+        text="\u270f\ufe0f Redakt\u0259 / Edit",
+        callback_data=f"alert:edit:{alert_id}",
+    )])
     buttons.append([InlineKeyboardButton(text="\U0001f5d1 Sil / Delete", callback_data=f"alert:delete:{alert_id}")])
     buttons.append([
         InlineKeyboardButton(text="\u2b05\ufe0f Geri / Back", callback_data="alert:list"),
         InlineKeyboardButton(text="\U0001f3e0 Menyu / Menu", callback_data="menu:main"),
     ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def alert_edit_keyboard(alert_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="\U0001f4b0 Qiym\u0259ti d\u0259yi\u015f",
+            callback_data=f"alert:editprice:{alert_id}",
+        )],
+        [InlineKeyboardButton(
+            text="\U0001f3ea Ma\u011fazalar\u0131 d\u0259yi\u015f",
+            callback_data=f"alert:editstores:{alert_id}",
+        )],
+        [InlineKeyboardButton(
+            text="\U0001f4c2 Kateqoriyan\u0131 d\u0259yi\u015f",
+            callback_data=f"alert:editcat:{alert_id}",
+        )],
+        [InlineKeyboardButton(
+            text="\u2b05\ufe0f Geri",
+            callback_data=f"alert:view:{alert_id}",
+        )],
+    ])
 
 
 def pagination_keyboard(page: int, total_pages: int, prefix: str = "page") -> InlineKeyboardMarkup:
@@ -155,7 +192,10 @@ def start_actions_inline() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="\U0001f4ca Yeni Alert", callback_data="menu:alert"),
             InlineKeyboardButton(text="\U0001f4cb Alertl\u0259rim", callback_data="menu:myalerts"),
         ],
-        [InlineKeyboardButton(text="\u2139\ufe0f K\u00f6m\u0259k", callback_data="menu:help")],
+        [
+            InlineKeyboardButton(text="\u2699\ufe0f T\u0259nziml\u0259m\u0259l\u0259r", callback_data="menu:settings"),
+            InlineKeyboardButton(text="\u2139\ufe0f K\u00f6m\u0259k", callback_data="menu:help"),
+        ],
     ])
 
 
@@ -186,6 +226,32 @@ def after_delete_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="\u2b05\ufe0f Alertl\u0259r\u0259 qay\u0131t", callback_data="alert:list")],
         [InlineKeyboardButton(text="\U0001f4ca Yeni alert", callback_data="menu:alert")],
         [InlineKeyboardButton(text="\U0001f3e0 Menyu", callback_data="menu:main")],
+    ])
+
+
+def settings_keyboard() -> InlineKeyboardMarkup:
+    """Main settings menu."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="\U0001f515 Sakit saatlar / Quiet hours",
+            callback_data="settings:quiethours",
+        )],
+        [InlineKeyboardButton(text="\u2b05\ufe0f Menyu", callback_data="menu:main")],
+    ])
+
+
+def quiet_hours_keyboard() -> InlineKeyboardMarkup:
+    """Quiet hours sub-menu."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="\U0001f319 T\u0259yin et / Set",
+            callback_data="settings:quietset",
+        )],
+        [InlineKeyboardButton(
+            text="\U0001f5d1 S\u00f6nd\u00fcr / Disable",
+            callback_data="settings:quietoff",
+        )],
+        [InlineKeyboardButton(text="\u2b05\ufe0f Geri", callback_data="menu:settings")],
     ])
 
 

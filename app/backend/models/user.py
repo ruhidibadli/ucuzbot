@@ -18,6 +18,8 @@ class User(Base):
     language_code: Mapped[str] = mapped_column(String(10), default="az")
     subscription_tier: Mapped[str] = mapped_column(String(20), default="free")
     max_alerts: Mapped[int] = mapped_column(Integer, default=5)
+    quiet_hours_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    quiet_hours_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

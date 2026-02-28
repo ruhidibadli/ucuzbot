@@ -29,6 +29,43 @@ def _make_session_factory() -> tuple:
     return task_engine, factory
 
 
+def _is_quiet_hours(user) -> bool:
+    if user is None:
+        return False
+    if user.quiet_hours_start is None or user.quiet_hours_end is None:
+        return False
+    try:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("Asia/Baku")
+    except Exception:
+        return False
+    current_hour = datetime.now(tz).hour
+    start = user.quiet_hours_start
+    end = user.quiet_hours_end
+    if start <= end:
+        return start <= current_hour < end
+    else:
+        # Wraps midnight, e.g. 23 -> 7
+        return current_hour >= start or current_hour < end
+
+
+def _make_alert_data(alert) -> dict:
+    return {
+        "id": alert.id,
+        "search_query": alert.search_query,
+        "target_price": str(alert.target_price),
+    }
+
+
+def _make_product_data(product, store_name: str) -> dict:
+    return {
+        "product_name": product.product_name,
+        "price": str(product.price),
+        "store_name": store_name,
+        "product_url": product.product_url,
+    }
+
+
 async def _check_single_alert(alert_id: int) -> None:
     task_engine, session_factory = _make_session_factory()
     try:
@@ -54,6 +91,12 @@ async def _check_single_alert(alert_id: int) -> None:
 
             lowest = products[0]  # Already sorted by price
             if check_price_trigger(alert, lowest.price):
+                # Check quiet hours — skip notification but don't mark triggered
+                if _is_quiet_hours(alert.user):
+                    logger.info("quiet_hours_skipped", alert_id=alert.id)
+                    await session.commit()
+                    return
+
                 await mark_alert_triggered(session, alert)
                 store_config = STORE_CONFIGS.get(lowest.store_slug, {})
                 store_name = store_config.get("name", lowest.store_slug)
@@ -63,11 +106,11 @@ async def _check_single_alert(alert_id: int) -> None:
                     user_id=alert.user_id,
                     telegram_id=alert.user.telegram_id if alert.user else None,
                     action="alert_triggered",
-                    detail=f"{alert.search_query} \u2192 {lowest.price} AZN at {lowest.store_slug}",
+                    detail=f"{alert.search_query} → {lowest.price} AZN at {lowest.store_slug}",
                 )
 
                 if alert.user and alert.user.telegram_id:
-                    await send_price_alert(
+                    success = await send_price_alert(
                         telegram_id=alert.user.telegram_id,
                         alert=alert,
                         product_name=lowest.product_name,
@@ -75,6 +118,13 @@ async def _check_single_alert(alert_id: int) -> None:
                         store_name=store_name,
                         product_url=lowest.product_url,
                     )
+                    if not success:
+                        from app.backend.tasks.notifications import retry_send_telegram_alert
+                        retry_send_telegram_alert.delay(
+                            alert.user.telegram_id,
+                            _make_alert_data(alert),
+                            _make_product_data(lowest, store_name),
+                        )
 
                 # Send browser push notifications
                 await send_push_alerts_for_alert(

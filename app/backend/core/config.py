@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     PREMIUM_TIER_MAX_ALERTS: int = 50
     PRICE_CHECK_INTERVAL_HOURS: int = 4
 
+    # Caching
+    SEARCH_CACHE_TTL: int = 600  # 10 minutes
+
+    # Alert expiration
+    ALERT_EXPIRATION_DAYS: int = 90
+
     # JWT Auth
     JWT_SECRET_KEY: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"

@@ -17,6 +17,7 @@ from app.backend.bot.keyboards import (
 from app.backend.db.base import async_session_factory
 from app.backend.models.bot_activity import log_bot_activity
 from app.backend.models.user import User
+from app.backend.services.category_detector import detect_categories
 from app.backend.services.search_service import search_all_stores
 
 router = Router()
@@ -58,7 +59,11 @@ async def _execute_search(message: Message, query: str, state: FSMContext | None
 
     wait_msg = await message.answer("\u23f3 Axtar\u0131l\u0131r... / Searching...")
 
-    products, errors = await search_all_stores(query)
+    # Auto-detect category to filter accessories from search results
+    categories = detect_categories(query)
+    auto_category = categories[0].slug if categories else None
+
+    products, errors = await search_all_stores(query, product_category=auto_category)
 
     # Log search activity
     try:

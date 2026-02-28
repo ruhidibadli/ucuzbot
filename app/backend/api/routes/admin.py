@@ -16,6 +16,8 @@ from app.backend.schemas.admin import (
     AdminStatsResponse,
     AdminUserListItem,
     AdminUserListResponse,
+    ScraperHealthItem,
+    ScraperHealthResponse,
 )
 
 router = APIRouter()
@@ -231,3 +233,33 @@ async def admin_bot_activity(
         ))
 
     return AdminBotActivityResponse(activities=items, total=total, page=page, page_size=page_size)
+
+
+@router.get("/admin/scraper-health", response_model=ScraperHealthResponse)
+async def admin_scraper_health(
+    _admin: User = Depends(get_admin_user),
+):
+    from app.backend.services.cache_service import get_scraper_health
+    from app.shared.constants import STORE_CONFIGS
+
+    health_data = await get_scraper_health()
+
+    items = []
+    for slug, config in STORE_CONFIGS.items():
+        data = health_data.get(slug, {})
+        success = data.get("success_count", 0)
+        failure = data.get("failure_count", 0)
+        total = success + failure
+        rate = (success / total * 100) if total > 0 else 0.0
+
+        items.append(ScraperHealthItem(
+            slug=slug,
+            name=config["name"],
+            success_count=success,
+            failure_count=failure,
+            success_rate=round(rate, 1),
+            last_success=data.get("last_success_at"),
+            last_failure=data.get("last_failure_at"),
+        ))
+
+    return ScraperHealthResponse(stores=items)

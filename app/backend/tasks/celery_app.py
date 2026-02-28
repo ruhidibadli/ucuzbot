@@ -34,4 +34,5 @@ celery_app.conf.beat_schedule = {
 celery_app.conf.include = [
     "app.backend.tasks.price_check",
     "app.backend.tasks.cleanup",
+    "app.backend.tasks.notifications",
 ]
