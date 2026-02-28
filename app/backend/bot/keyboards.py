@@ -60,6 +60,19 @@ def after_search_keyboard(query: str) -> InlineKeyboardMarkup:
     ])
 
 
+def category_selection_keyboard(categories: list) -> InlineKeyboardMarkup:
+    """Shown after query to let user pick a product category for filtering."""
+    buttons = []
+    for cat in categories:
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"{cat.emoji} {cat.name_az}",
+                callback_data=f"cat:{cat.slug}",
+            )
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 def store_selection_keyboard(selected: set[str] | None = None) -> InlineKeyboardMarkup:
     selected = selected or set()
     buttons = []
@@ -97,15 +110,24 @@ def alert_list_keyboard(alerts: list) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def alert_detail_keyboard(alert_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="\U0001f504 \u0130ndi yoxla / Check Now", callback_data=f"alert:check:{alert_id}")],
-        [InlineKeyboardButton(text="\U0001f5d1 Sil / Delete", callback_data=f"alert:delete:{alert_id}")],
-        [
-            InlineKeyboardButton(text="\u2b05\ufe0f Geri / Back", callback_data="alert:list"),
-            InlineKeyboardButton(text="\U0001f3e0 Menyu / Menu", callback_data="menu:main"),
-        ],
+def alert_detail_keyboard(alert_id: int, is_triggered: bool = False) -> InlineKeyboardMarkup:
+    buttons = []
+    if is_triggered:
+        buttons.append([InlineKeyboardButton(
+            text="\U0001f504 Yenid\u0259n aktivl\u0259\u015fdir / Reactivate",
+            callback_data=f"alert:reactivate:{alert_id}",
+        )])
+    else:
+        buttons.append([InlineKeyboardButton(
+            text="\U0001f504 \u0130ndi yoxla / Check Now",
+            callback_data=f"alert:check:{alert_id}",
+        )])
+    buttons.append([InlineKeyboardButton(text="\U0001f5d1 Sil / Delete", callback_data=f"alert:delete:{alert_id}")])
+    buttons.append([
+        InlineKeyboardButton(text="\u2b05\ufe0f Geri / Back", callback_data="alert:list"),
+        InlineKeyboardButton(text="\U0001f3e0 Menyu / Menu", callback_data="menu:main"),
     ])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def pagination_keyboard(page: int, total_pages: int, prefix: str = "page") -> InlineKeyboardMarkup:

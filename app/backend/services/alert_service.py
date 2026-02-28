@@ -45,6 +45,7 @@ async def create_alert(
     search_query: str,
     target_price: Decimal,
     store_slugs: list[str],
+    product_category: str | None = None,
 ) -> Alert:
     existing = await _find_duplicate_alert(session, user_id=user.id, search_query=search_query)
     if existing:
@@ -55,6 +56,7 @@ async def create_alert(
         search_query=search_query,
         target_price=target_price,
         store_slugs=store_slugs,
+        product_category=product_category,
     )
     session.add(alert)
     await session.flush()
@@ -68,6 +70,7 @@ async def create_alert_for_push(
     search_query: str,
     target_price: Decimal,
     store_slugs: list[str],
+    product_category: str | None = None,
 ) -> Alert:
     if push_sub.user_id:
         existing = await _find_duplicate_alert(session, user_id=push_sub.user_id, search_query=search_query)
@@ -84,6 +87,7 @@ async def create_alert_for_push(
         search_query=search_query,
         target_price=target_price,
         store_slugs=store_slugs,
+        product_category=product_category,
     )
     session.add(alert)
     await session.flush()

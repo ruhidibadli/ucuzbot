@@ -12,6 +12,7 @@ class AlertCreate(BaseModel):
     search_query: str = Field(max_length=500)
     target_price: Decimal = Field(gt=0, decimal_places=2)
     store_slugs: list[str] = Field(min_length=1)
+    product_category: str | None = None
     push_endpoint: str | None = None
 
     @field_validator("store_slugs")
@@ -28,6 +29,7 @@ class AlertResponse(BaseModel):
     search_query: str
     target_price: Decimal
     store_slugs: list[str]
+    product_category: str | None = None
     is_active: bool
     is_triggered: bool
     triggered_at: datetime | None

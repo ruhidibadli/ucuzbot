@@ -51,7 +51,8 @@ async def create_new_alert(
     if current_user and data.telegram_id is None and data.push_endpoint is None:
         try:
             alert = await create_alert(
-                db, current_user, data.search_query, data.target_price, data.store_slugs
+                db, current_user, data.search_query, data.target_price, data.store_slugs,
+                product_category=data.product_category,
             )
             await db.commit()
         except DuplicateAlert as e:
@@ -72,7 +73,8 @@ async def create_new_alert(
         user = await get_or_create_user(db, data.telegram_id)
         try:
             alert = await create_alert(
-                db, user, data.search_query, data.target_price, data.store_slugs
+                db, user, data.search_query, data.target_price, data.store_slugs,
+                product_category=data.product_category,
             )
             await db.commit()
         except DuplicateAlert as e:
@@ -98,7 +100,8 @@ async def create_new_alert(
         )
     try:
         alert = await create_alert_for_push(
-            db, push_sub, data.search_query, data.target_price, data.store_slugs
+            db, push_sub, data.search_query, data.target_price, data.store_slugs,
+            product_category=data.product_category,
         )
         await db.commit()
     except DuplicateAlert as e:
