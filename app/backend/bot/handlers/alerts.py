@@ -4,6 +4,7 @@ from aiogram import Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.enums import ChatAction
 from aiogram.types import Message
 
 from sqlalchemy import update
@@ -143,7 +144,7 @@ async def alert_receive_query(message: Message, state: FSMContext):
         await message.answer("❌ Ən azı 2 simvol daxil edin / Enter at least 2 characters")
         return
 
-    await message.answer_chat_action("typing")
+    await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
     wait_msg = await message.answer("⏳ Axtarılır... / Searching...")
     products, _ = await search_all_stores(query, max_results_per_store=3)
 
@@ -211,7 +212,7 @@ async def alert_edit_receive_price(message: Message, state: FSMContext):
 
 @router.message(Command("myalerts"))
 async def cmd_myalerts(message: Message):
-    await message.answer_chat_action("typing")
+    await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
     async with async_session_factory() as session:
         alerts = await get_user_alerts(session, message.from_user.id)
 
