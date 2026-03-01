@@ -11,12 +11,14 @@ from sqlalchemy import select
 from app.backend.bot.keyboards import (
     after_search_keyboard,
     cancel_inline_keyboard,
+    maybe_tip,
     no_results_keyboard,
     pagination_keyboard,
 )
 from app.backend.db.base import async_session_factory
 from app.backend.models.bot_activity import log_bot_activity
 from app.backend.models.user import User
+from app.backend.services.category_detector import detect_categories
 from app.backend.services.search_service import search_all_stores
 
 router = Router()
@@ -56,9 +58,14 @@ async def _execute_search(message: Message, query: str, state: FSMContext | None
         await message.answer("\u274c \u018fn az\u0131 2 simvol daxil edin / Enter at least 2 characters")
         return
 
+    await message.answer_chat_action("typing")
     wait_msg = await message.answer("\u23f3 Axtar\u0131l\u0131r... / Searching...")
 
-    products, errors = await search_all_stores(query)
+    # Auto-detect category to filter accessories from search results
+    categories = detect_categories(query)
+    auto_category = categories[0].slug if categories else None
+
+    products, errors = await search_all_stores(query, product_category=auto_category)
 
     # Log search activity
     try:
@@ -82,14 +89,21 @@ async def _execute_search(message: Message, query: str, state: FSMContext | None
     if not products:
         error_text = ""
         if errors:
-            error_text = "\n\n\u26a0\ufe0f B\u0259zi ma\u011fazalarda x\u0259ta: " + ", ".join(errors)
+            error_text = f"\n\n\u26a0\ufe0f {len(errors)} ma\u011fazada x\u0259ta: " + ", ".join(errors)
+        tip = maybe_tip("search_no_results")
         await wait_msg.edit_text(
-            f"\U0001f614 N\u0259tic\u0259 tap\u0131lmad\u0131: \"{query}\"{error_text}",
+            f"\U0001f614 N\u0259tic\u0259 tap\u0131lmad\u0131: \"{query}\"{error_text}{tip}",
             reply_markup=no_results_keyboard(query),
         )
         return
 
-    text = format_search_results(products, query)
+    # Build progress summary
+    store_count = len({p.store_slug for p in products})
+    summary = f"\u2705 {store_count} ma\u011fazada {len(products)} n\u0259tic\u0259 tap\u0131ld\u0131"
+    if errors:
+        summary += f"\n\u26a0\ufe0f {len(errors)} ma\u011fazada x\u0259ta"
+
+    text = summary + "\n\n" + format_search_results(products, query)
     total_pages = math.ceil(len(products) / RESULTS_PER_PAGE)
 
     # Store results in FSM state for pagination

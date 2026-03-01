@@ -3,7 +3,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.backend.core.exceptions import AlertNotFound, DuplicateAlert
+from app.backend.core.exceptions import AlertLimitReached, AlertNotFound, DuplicateAlert
 from app.backend.core.logging import get_logger
 from app.backend.models.alert import Alert
 from app.backend.models.push_subscription import PushSubscription
@@ -18,7 +18,7 @@ async def get_or_create_user(
     username: str | None = None,
     first_name: str | None = None,
     language_code: str = "az",
-) -> User:
+) -> tuple[User, bool]:
     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
     if user:
@@ -26,7 +26,7 @@ async def get_or_create_user(
             user.username = username
         if first_name:
             user.first_name = first_name
-        return user
+        return user, False
 
     user = User(
         telegram_id=telegram_id,
@@ -36,7 +36,21 @@ async def get_or_create_user(
     )
     session.add(user)
     await session.flush()
-    return user
+    return user, True
+
+
+async def _check_alert_limit(session: AsyncSession, user: User) -> None:
+    from sqlalchemy import func as sa_func
+
+    count_result = await session.execute(
+        select(sa_func.count(Alert.id)).where(
+            Alert.user_id == user.id,
+            Alert.is_active == True,  # noqa: E712
+        )
+    )
+    count = count_result.scalar_one()
+    if count >= user.max_alerts:
+        raise AlertLimitReached(user.max_alerts)
 
 
 async def create_alert(
@@ -47,6 +61,8 @@ async def create_alert(
     store_slugs: list[str],
     product_category: str | None = None,
 ) -> Alert:
+    await _check_alert_limit(session, user)
+
     existing = await _find_duplicate_alert(session, user_id=user.id, search_query=search_query)
     if existing:
         raise DuplicateAlert(search_query)
@@ -73,6 +89,10 @@ async def create_alert_for_push(
     product_category: str | None = None,
 ) -> Alert:
     if push_sub.user_id:
+        user_result = await session.execute(select(User).where(User.id == push_sub.user_id))
+        push_user = user_result.scalar_one_or_none()
+        if push_user:
+            await _check_alert_limit(session, push_user)
         existing = await _find_duplicate_alert(session, user_id=push_sub.user_id, search_query=search_query)
         if existing:
             raise DuplicateAlert(search_query)
@@ -138,6 +158,40 @@ async def delete_alert(session: AsyncSession, alert_id: int, telegram_id: int) -
         raise AlertNotFound(f"Alert {alert_id} not found")
     alert.is_active = False
     logger.info("alert_deleted", alert_id=alert_id)
+
+
+async def update_alert(
+    session: AsyncSession,
+    alert_id: int,
+    telegram_id: int,
+    target_price: Decimal | None = None,
+    store_slugs: list[str] | None = None,
+    product_category: str | None = None,
+) -> Alert:
+    result = await session.execute(
+        select(Alert)
+        .join(User)
+        .where(Alert.id == alert_id, User.telegram_id == telegram_id)
+    )
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise AlertNotFound(f"Alert {alert_id} not found")
+
+    if target_price is not None:
+        alert.target_price = target_price
+    if store_slugs is not None:
+        alert.store_slugs = store_slugs
+    if product_category is not None:
+        alert.product_category = product_category
+
+    logger.info("alert_updated", alert_id=alert_id, fields={
+        k: v for k, v in {
+            "target_price": str(target_price) if target_price else None,
+            "store_slugs": store_slugs,
+            "product_category": product_category,
+        }.items() if v is not None
+    })
+    return alert
 
 
 async def _find_duplicate_alert(

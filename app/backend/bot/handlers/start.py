@@ -8,9 +8,11 @@ from app.backend.bot.keyboards import (
     BTN_MY_ALERTS,
     BTN_NEW_ALERT,
     BTN_SEARCH,
+    ONBOARDING_STEPS,
     cancel_inline_keyboard,
     main_menu_inline,
     main_menu_keyboard,
+    onboarding_keyboard,
     start_actions_inline,
 )
 from app.backend.db.base import async_session_factory
@@ -47,6 +49,18 @@ HELP_MESSAGE = (
     "\U0001f4cb  Alertl\u0259rim\n"
     "   \"\U0001f4cb Alertl\u0259rim\" d\u00fcym\u0259si il\u0259 aktiv alertl\u0259rinizi g\u00f6r\u00fcn,\n"
     "   t\u0259f\u0259rr\u00fcat\u0131na bax\u0131n v\u0259 ya silin.\n\n"
+    "\u270f\ufe0f  Redakt\u0259\n"
+    "   Alert t\u0259f\u0259rr\u00fcatlar\u0131nda \"\u270f\ufe0f Redakt\u0259\" il\u0259 h\u0259d\u0259f qiym\u0259ti,\n"
+    "   ma\u011fazalar\u0131 v\u0259 ya kateqoriyan\u0131 d\u0259yi\u015fin.\n\n"
+    "\U0001f4c8  Qiym\u0259t tarixi\n"
+    "   Alert t\u0259f\u0259rr\u00fcatlar\u0131nda son qiym\u0259t d\u0259yi\u015fiklikl\u0259rini\n"
+    "   izl\u0259yin.\n\n"
+    "\U0001f4c2  Kateqoriya\n"
+    "   M\u0259hsullar avtomatik kateqoriyala\u015fd\u0131r\u0131l\u0131r.\n"
+    "   Alert yarad\u0131landa uy\u011fun kateqoriya t\u0259klif olunur.\n\n"
+    "\u2699\ufe0f  T\u0259nziml\u0259m\u0259l\u0259r\n"
+    "   /settings \u2014 sakit saatlar t\u0259yin edin,\n"
+    "   gec\u0259 vaxt\u0131 bildiri\u015fl\u0259r g\u00f6nd\u0259rilm\u0259sin.\n\n"
     "\U0001f4a1 Pulsuz hesab: 5 alert limiti\n"
     "\U0001f310 ucuzatap.az"
 )
@@ -56,7 +70,7 @@ HELP_MESSAGE = (
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     async with async_session_factory() as session:
-        await get_or_create_user(
+        user, is_new = await get_or_create_user(
             session,
             telegram_id=message.from_user.id,
             username=message.from_user.username,
@@ -64,12 +78,23 @@ async def cmd_start(message: Message, state: FSMContext):
             language_code=message.from_user.language_code or "az",
         )
         await session.commit()
+
     first_name = message.from_user.first_name or "dostum"
+    should_onboard = is_new or not user.has_completed_onboarding
+
     await message.answer(
         WELCOME_MESSAGE.format(first_name=first_name),
         reply_markup=main_menu_keyboard(),
     )
-    await message.answer("N\u0259 etm\u0259k ist\u0259yirsiniz?", reply_markup=start_actions_inline())
+
+    if should_onboard:
+        step_data = ONBOARDING_STEPS[1]
+        await message.answer(
+            f"(1/3) {step_data['title']}\n\n{step_data['text']}",
+            reply_markup=onboarding_keyboard(1),
+        )
+    else:
+        await message.answer("N\u0259 etm\u0259k ist\u0259yirsiniz?", reply_markup=start_actions_inline())
 
 
 @router.message(Command("help"))

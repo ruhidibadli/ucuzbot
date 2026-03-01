@@ -3,11 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backend.api.dependencies import get_current_user, get_db, get_optional_user
-from app.backend.core.exceptions import AlertNotFound, DuplicateAlert
+from app.backend.core.exceptions import AlertLimitReached, AlertNotFound, DuplicateAlert
 from app.backend.models.alert import Alert
 from app.backend.models.push_subscription import PushSubscription
 from app.backend.models.user import User
-from app.backend.schemas.alert import AlertCreate, AlertResponse
+from app.backend.schemas.alert import AlertCreate, AlertResponse, AlertUpdate
 from app.backend.services.alert_service import (
     create_alert,
     create_alert_for_push,
@@ -15,6 +15,7 @@ from app.backend.services.alert_service import (
     get_alerts_by_push_endpoint,
     get_or_create_user,
     get_user_alerts,
+    update_alert,
 )
 from app.backend.tasks.price_check import check_single_alert
 
@@ -55,6 +56,8 @@ async def create_new_alert(
                 product_category=data.product_category,
             )
             await db.commit()
+        except AlertLimitReached as e:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e))
         except DuplicateAlert as e:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
         try:
@@ -70,13 +73,15 @@ async def create_new_alert(
         )
 
     if data.telegram_id is not None:
-        user = await get_or_create_user(db, data.telegram_id)
+        user, _ = await get_or_create_user(db, data.telegram_id)
         try:
             alert = await create_alert(
                 db, user, data.search_query, data.target_price, data.store_slugs,
                 product_category=data.product_category,
             )
             await db.commit()
+        except AlertLimitReached as e:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e))
         except DuplicateAlert as e:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
         try:
@@ -104,6 +109,8 @@ async def create_new_alert(
             product_category=data.product_category,
         )
         await db.commit()
+    except AlertLimitReached as e:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e))
     except DuplicateAlert as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     try:
@@ -111,6 +118,45 @@ async def create_new_alert(
     except Exception:
         pass
     return alert
+
+
+@router.patch("/alerts/{alert_id}", response_model=AlertResponse)
+async def update_existing_alert(
+    alert_id: int,
+    data: AlertUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
+):
+    # Build kwargs from provided fields
+    kwargs = {}
+    if data.target_price is not None:
+        kwargs["target_price"] = data.target_price
+    if data.store_slugs is not None:
+        kwargs["store_slugs"] = data.store_slugs
+    if data.product_category is not None:
+        kwargs["product_category"] = data.product_category
+
+    if not kwargs:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields to update",
+        )
+
+    # Determine telegram_id for ownership check
+    if current_user and current_user.telegram_id:
+        telegram_id = current_user.telegram_id
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+
+    try:
+        alert = await update_alert(db, alert_id, telegram_id, **kwargs)
+        await db.commit()
+        return alert
+    except AlertNotFound as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.post("/alerts/by-push", response_model=list[AlertResponse])

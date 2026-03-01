@@ -76,3 +76,17 @@ class AdminBotActivityResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class ScraperHealthItem(BaseModel):
+    slug: str
+    name: str
+    success_count: int
+    failure_count: int
+    success_rate: float
+    last_success: str | None
+    last_failure: str | None
+
+
+class ScraperHealthResponse(BaseModel):
+    stores: list[ScraperHealthItem]

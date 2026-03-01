@@ -24,6 +24,24 @@ class AlertCreate(BaseModel):
         return v
 
 
+class AlertUpdate(BaseModel):
+    target_price: Decimal | None = None
+    store_slugs: list[str] | None = None
+    product_category: str | None = None
+
+    @field_validator("store_slugs")
+    @classmethod
+    def validate_store_slugs(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        if len(v) < 1:
+            raise ValueError("At least one store slug is required")
+        invalid = [s for s in v if s not in VALID_STORE_SLUGS]
+        if invalid:
+            raise ValueError(f"Invalid store slugs: {', '.join(invalid)}")
+        return v
+
+
 class AlertResponse(BaseModel):
     id: int
     search_query: str

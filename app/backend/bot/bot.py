@@ -47,6 +47,7 @@ async def main():
         BotCommand(command="search", description="M\u0259hsul axtar / Search product"),
         BotCommand(command="alert", description="Qiym\u0259t alerti yarat / Create alert"),
         BotCommand(command="myalerts", description="Alert\u0259l\u0259rim / My alerts"),
+        BotCommand(command="settings", description="T\u0259nziml\u0259m\u0259l\u0259r / Settings"),
         BotCommand(command="help", description="K\u00f6m\u0259k / Help"),
         BotCommand(command="cancel", description="L\u0259\u011fv et / Cancel"),
     ])
