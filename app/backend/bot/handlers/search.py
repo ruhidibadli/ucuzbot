@@ -4,6 +4,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.enums import ChatAction
 from aiogram.types import Message
 
 from sqlalchemy import select
@@ -58,7 +59,7 @@ async def _execute_search(message: Message, query: str, state: FSMContext | None
         await message.answer("\u274c \u018fn az\u0131 2 simvol daxil edin / Enter at least 2 characters")
         return
 
-    await message.answer_chat_action("typing")
+    await message.bot.send_chat_action(chat_id=message.chat.id, action=ChatAction.TYPING)
     wait_msg = await message.answer("\u23f3 Axtar\u0131l\u0131r... / Searching...")
 
     # Auto-detect category to filter accessories from search results

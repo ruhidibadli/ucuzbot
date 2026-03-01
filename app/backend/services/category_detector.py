@@ -60,7 +60,7 @@ CATEGORIES: dict[str, ProductCategory] = {
         name_az="Noutbuk",
         emoji="\U0001f4bb",
         trigger_keywords=(
-            "macbook", "laptop", "noutbuk", "notebook",
+            "macbook", "laptop", "noutbuk", "notebook", "matebook",
             "thinkpad", "ideapad", "vivobook", "zenbook",
             "rog strix", "legion", "pavilion", "inspiron",
             "surface laptop", "chromebook",

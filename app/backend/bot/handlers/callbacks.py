@@ -4,6 +4,7 @@ from decimal import Decimal
 from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
+from aiogram.enums import ChatAction
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.backend.bot.handlers.alerts import AlertCreation, AlertEditing, UserSettings
@@ -95,7 +96,7 @@ async def handle_menu(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
 
     elif action == "myalerts":
-        await callback.message.answer_chat_action("typing")
+        await callback.bot.send_chat_action(chat_id=callback.message.chat.id, action=ChatAction.TYPING)
         async with async_session_factory() as session:
             alerts = await get_user_alerts(session, callback.from_user.id)
         if not alerts:
@@ -404,7 +405,7 @@ async def handle_alert_actions(callback: CallbackQuery, state: FSMContext):
     action = parts[1]
 
     if action == "list":
-        await callback.message.answer_chat_action("typing")
+        await callback.bot.send_chat_action(chat_id=callback.message.chat.id, action=ChatAction.TYPING)
         async with async_session_factory() as session:
             alerts = await get_user_alerts(session, callback.from_user.id)
         if not alerts:
